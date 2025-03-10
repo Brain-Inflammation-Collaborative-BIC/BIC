@@ -1,0 +1,162 @@
+# Load necessary libraries
+library(openxlsx)
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(readxl)
+library(tidygeocoder)
+library(stringr)
+
+# Set working directory and load data
+setwd("/Users/jameshunt/Desktop/BIC Data/")
+IVIG <- read_excel("~/Desktop/BIC Data/IVIG survey_March 5, 2025_11.34.xlsx")
+
+# Clean up the data frame
+IVIG <- IVIG[-2, ]  # Remove the second row
+colnames(IVIG) <- IVIG[1, ]  # Set the first row as column names
+IVIG <- IVIG[-1, ]  # Remove the first row (now that it's the header)
+
+# Check for duplicate column names and make them unique
+duplicate_names <- names(IVIG)[duplicated(names(IVIG))]
+print(duplicate_names)
+names(IVIG) <- make.unique(names(IVIG))
+
+# Recode gender columns
+IVIG <- IVIG %>%
+  mutate(
+    child_gender = case_when(
+      `What gender(s) does your child most closely identify with? - Girl` == "Girl" ~ 1,
+      `What gender(s) does your child most closely identify with? - Boy` == "Boy" ~ 2,
+      `What gender(s) does your child most closely identify with? - Transgender` == "Transgender" ~ 3,
+      `What gender(s) does your child most closely identify with? - Nonbinary` == "Nonbinary" ~ 4,
+      `What gender(s) does your child most closely identify with? - Prefer not to say` == "Prefer not to say" ~ 5,
+      `What gender(s) does your child most closely identify with? - Prefer to self-describe` == "Prefer to self-describe" ~ 6,
+      TRUE ~ NA_real_
+    ),
+    adult_gender = case_when(
+      `What gender(s) do you most closely identify with? - Female` == "Female" ~ 1,
+      `What gender(s) do you most closely identify with? - Male` == "Male" ~ 2,
+      `What gender(s) do you most closely identify with? - Transgender` == "Transgender" ~ 3,
+      `What gender(s) do you most closely identify with? - Nonbinary` == "Nonbinary" ~ 4,
+      `What gender(s) do you most closely identify with? - Prefer not to say` == "Prefer not to say" ~ 5,
+      `What gender(s) do you most closely identify with? - Prefer to self-describe` == "Prefer to self-describe" ~ 6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  select(
+    -starts_with("What gender(s) does your child most closely identify with?"),
+    -starts_with("What gender(s) do you most closely identify with?")
+  )
+
+# Recode diagnosis columns
+IVIG <- IVIG %>%
+  mutate(across(
+    starts_with("What condition(s) have you been diagnosed with (select all that apply)?"),
+    ~ if_else(is.na(.), 0, if_else(. == sub(".*- ", "", cur_column()), 1, 0)),
+    .names = "diagnosis_adult_{col}"
+  )) %>%
+  mutate(across(
+    starts_with("What condition(s) has your child been diagnosed with (select all that apply)?"),
+    ~ if_else(is.na(.), 0, if_else(. == sub(".*- ", "", cur_column()), 1, 0)),
+    .names = "diagnosis_child_{col}"
+  )) %>%
+  select(
+    -starts_with("What condition(s) have you been diagnosed with (select all that apply)?"),
+    -starts_with("What condition(s) has your child been diagnosed with (select all that apply)?")
+  )
+
+# Clean up diagnosis column names
+names(IVIG) <- gsub(
+  "diagnosis_adult_What condition\\(s\\) have you been diagnosed with \\(select all that apply\\)\\? - ",
+  "diagnosis_adult_",
+  names(IVIG)
+)
+names(IVIG) <- gsub(
+  "diagnosis_child_What condition\\(s\\) has your child been diagnosed with \\(select all that apply\\)\\? - ",
+  "diagnosis_child_",
+  names(IVIG)
+)
+
+# Reverse geocode latitude and longitude
+IVIG <- IVIG %>%
+  reverse_geocode(
+    lat = "Location Latitude",
+    long = "Location Longitude",
+    method = "osm",
+    address = "location"
+  ) %>%
+  mutate(
+    state = str_extract(location, "\\b[A-Z]{2}\\b")
+  ) %>%
+  select(-location, -state)
+
+# Recode survey response and PANS/PANDAS columns
+IVIG <- IVIG %>%
+  mutate(
+    `I am responding to this survey as a:` = case_when(
+      `I am responding to this survey as a:` == "Adult patient" ~ 1,
+      `I am responding to this survey as a:` == "Parent of a patient" ~ 2,
+      `I am responding to this survey as a:` == "Patient under the age of 18, and I have parental/guardian supervision" ~ 3,
+      TRUE ~ 0
+    ),
+    `Does the patient have a suspected or confirmed diagnosis of PANS and/or PANDAS?` = case_when(
+      `Does the patient have a suspected or confirmed diagnosis of PANS and/or PANDAS?` == "The patient has not been diagnosed with PANS and/or PANDAS but it is suspected that they have it." ~ 1,
+      `Does the patient have a suspected or confirmed diagnosis of PANS and/or PANDAS?` == "The patient has been diagnosed with PANS and/or PANDAS by a doctor or clinical care provider." ~ 2,
+      TRUE ~ 0
+    )
+  )
+
+# Recode sex assigned at birth columns
+IVIG <- IVIG %>%
+  mutate(
+    `What is your sex, as assigned at birth?` = case_when(
+      `What is your sex, as assigned at birth?` == "Female" ~ 1,
+      `What is your sex, as assigned at birth?` == "Male" ~ 2,
+      `What is your sex, as assigned at birth?` == "Intersex" ~ 3,
+      TRUE ~ NA_real_
+    ),
+    `What is your child's sex, as assigned at birth?` = case_when(
+      `What is your child's sex, as assigned at birth?` == "Female" ~ 1,
+      `What is your child's sex, as assigned at birth?` == "Male" ~ 2,
+      `What is your child's sex, as assigned at birth?` == "Intersex" ~ 3,
+      TRUE ~ NA_real_
+    )
+  )
+
+# Recode race/ethnicity columns
+IVIG <- IVIG %>%
+  mutate(across(
+    starts_with("What is your race and/or ethnicity? Select all that apply."),
+    ~ if_else(is.na(.), 0, if_else(. == sub(".*- ", "", cur_column()), 1, 0)),
+    .names = "race_{col}"
+  )) %>%
+  select(-starts_with("What is your race and/or ethnicity? Select all that apply."))  # Remove old race columns
+
+# Clean up race/ethnicity column names
+names(IVIG) <- gsub(
+  "race_What is your race and/or ethnicity\\? Select all that apply\\. - ",
+  "race_",
+  names(IVIG)
+)
+
+# Recode work status columns
+IVIG <- IVIG %>%
+  mutate(across(
+    starts_with("What is your current work status?"),
+    ~ if_else(is.na(.), 0, if_else(. == sub(".*- ", "", cur_column()), 1, 0)),
+    .names = "work_{col}"
+  )) %>%
+  select(-starts_with("What is your current work status?"))  # Remove old work columns
+
+# Clean up work status column names
+names(IVIG) <- gsub(
+  "work_What is your current work status\\? - ",
+  "work_",
+  names(IVIG)
+)
+
+# Verify the results
+head(IVIG)
+
+# Export the cleaned data to Excel
+write.xlsx(IVIG, file = "IVIG_data.xlsx")
