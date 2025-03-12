@@ -54,8 +54,6 @@ IVIG <- IVIG %>%
   ) %>%
   select(-location, -state_name, -state_abbr)  # Drop intermediate columns
 
-# Verify the state column
-head(IVIG$state)
 
 # Replace NA with 0 in all relevant columns
 IVIG <- IVIG %>%
