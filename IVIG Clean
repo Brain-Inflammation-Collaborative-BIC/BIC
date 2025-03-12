@@ -114,9 +114,6 @@ IVIG <- IVIG %>%
     starts_with("IVIG has the ability to treat many different ailments"),
     ~ replace(., is.na(.), 0)
   ))
-colnames(IVIG)
-#Remove Columns
-library(dplyr)
 
 # Define columns_to_remove with exact column names from your dataset
 columns_to_remove <- c(
