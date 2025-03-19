@@ -172,7 +172,7 @@ IVIG <- IVIG %>%
     starts_with("IVIG has the ability to treat many different ailments"),
     ~ replace(., is.na(.), 0)
   )) %>%
-  mutate(`Please specify the percentage of IVIG treatment costs (including both medication and administration) covered by the patient‚Äôs insurance. Make an estimate if you are not entirely certain.` = 
+  mutate(across(`Please specify the percentage of IVIG treatment costs (including both medication and administration) covered by the patient‚Äôs insurance. Make an estimate if you are not entirely certain.` = 
            ifelse(`Please specify the percentage of IVIG treatment costs (including both medication and administration) covered by the patient‚Äôs insurance. Make an estimate if you are not entirely certain.` < 80, 0, 1))
 ))
 
