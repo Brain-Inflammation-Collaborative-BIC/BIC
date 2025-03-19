@@ -35,6 +35,35 @@ duplicate_names <- names(IVIG)[duplicated(names(IVIG))]
 print(duplicate_names)
 names(IVIG) <- make.unique(names(IVIG)) #check how this changes them
 
+#next check for the emails!
+#i saved the emails only as a new xlsx without a password 
+#- was having issues with using the password protected file in R
+file_path <- "previousIVIGemails.xlsx"
+df <- read_excel(file_path)
+# Extract the first column from row 2 to the end
+column_data <- df[[1]][-1]  # Remove the first row (header)
+# Convert to comma-separated string
+previousemails <- paste(column_data, collapse = ", ")
+previousemails <- tolower(previousemails)
+# Ensure 'previousemails' is a character vector and trim whitespace
+previousemails <- trimws(as.character(previousemails))
+
+# Convert complex column name to Email
+IVIG <- IVIG %>%
+  rename(Email = 'Please provide your email address (this will allow the BIC team to help you with the survey if any questions arise):')
+IVIG$Email <- tolower(IVIG$Email)
+# Ensure Email column in IVIG is a character vector and trim whitespace
+IVIG$Email <- trimws(as.character(IVIG$Email))
+# Identify matches
+matches <- IVIG$Email %in% previousemails
+# Print matching emails
+matching_emails <- IVIG$Email[matches]
+cat("Matching emails:\n")
+print(matching_emails)
+# Remove rows with matching emails from IVIG
+IVIG <- IVIG[!matches, ]
+#what % progress is finished?
+
 #categorize the responses based on the number of rows
 n <- nrow(IVIG)
 # Convert complex column name to Age
