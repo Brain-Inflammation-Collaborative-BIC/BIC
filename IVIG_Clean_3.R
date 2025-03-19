@@ -172,9 +172,10 @@ IVIG <- IVIG %>%
     starts_with("IVIG has the ability to treat many different ailments"),
     ~ replace(., is.na(.), 0)
   )) %>%
-  mutate(across(`Please specify the percentage of IVIG treatment costs (including both medication and administration) covered by the patient‚Äôs insurance. Make an estimate if you are not entirely certain.` = 
-           ifelse(`Please specify the percentage of IVIG treatment costs (including both medication and administration) covered by the patient‚Äôs insurance. Make an estimate if you are not entirely certain.` < 80, 0, 1))
-))
+  mutate(across(
+    starts_with("Please specify the percentage of IVIG treatment costs"),
+    ~ ifelse(. < 80, 0, 1)
+  ))
 
 # Define columns_to_remove with exact column names from your dataset
 columns_to_remove <- c(
