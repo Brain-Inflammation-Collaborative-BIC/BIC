@@ -230,6 +230,17 @@ columns_to_remove <- c(
 IVIG <- IVIG %>%
   select(-all_of(columns_to_remove))
 
+# Define PHI_to_remove with exact column names from your dataset - for sharing cleaned data 
+#need to modify to save to another pp file with corresponding name
+PHI_to_remove <- c(
+  "IP Address",
+  "Email",
+  "Please provide your email address (this will allow the BIC team to help you with the survey if any questions arise):.1"
+)
+
+IVIG <- IVIG %>%
+  select(-all_of(PHI_to_remove))
+
 # Export the cleaned data
 library(openxlsx)
 write.xlsx(IVIG, file = "IVIG_cleaned.xlsx")
