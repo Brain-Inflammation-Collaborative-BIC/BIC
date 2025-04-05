@@ -6,10 +6,11 @@ library(dplyr)
 library(readxl)
 library(tidygeocoder)
 library(stringr)
+library(openxlsx)
 
 # Set working directory and load data - had to change to work with my icloud folder
-setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/Qualtrics")
-IVIG <- read_excel("IVIGsurvey_3_14_25_values.xlsx")
+setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/IVIG/Qualtrics")
+IVIG <- read_excel("IVIGsurvey_3_31_25_values.xlsx")
 
 # Clean up the data frame
 IVIG <- IVIG[-2, ]  # Remove the second row
@@ -62,7 +63,6 @@ cat("Matching emails:\n")
 print(matching_emails)
 # Remove rows with matching emails from IVIG
 IVIG <- IVIG[!matches, ]
-#what % progress is finished?
 
 #categorize the responses based on the number of rows
 n <- nrow(IVIG)
@@ -230,17 +230,34 @@ columns_to_remove <- c(
 IVIG <- IVIG %>%
   select(-all_of(columns_to_remove))
 
-# Define PHI_to_remove with exact column names from your dataset - for sharing cleaned data 
-#need to modify to save to another pp file with corresponding name
-PHI_to_remove <- c(
+#pull date to apply automatically to saved files
+todays_date <- format(Sys.Date(), "%m%d%y")
+
+# Define PHI_to_remove with exact column names from your dataset - for sharing cleaned data
+column_names <- c(
   "IP Address",
   "Email",
   "Please provide your email address (this will allow the BIC team to help you with the survey if any questions arise):.1"
 )
 
-IVIG <- IVIG %>%
-  select(-all_of(PHI_to_remove))
+# select the PHI columns
+IVIG_PHI <- IVIG[, column_names]
 
-# Export the cleaned data
-library(openxlsx)
-write.xlsx(IVIG, file = "IVIG_cleaned.xlsx")
+# Concatenate the date with the filename
+PHI_file <- paste0("IVIG_PHI_cleaned_", todays_date, ".xlsx")
+
+write.xlsx(IVIG_PHI, file = PHI_file)  # Save the data with the dynamic filename
+
+#password protect to PHI data using add_password.sh bash script I made - add later
+
+#remove PHI now that it is saved separately 
+IVIG <- IVIG %>%
+  select(-all_of(column_names))
+
+# Concatenate the date with the filename
+cleaned_file <- paste0("IVIG_cleaned_", todays_date, ".xlsx")  # Concatenate the date with the filename
+# Export the cleaned data with the dynamic filename
+write.xlsx(IVIG, file = cleaned_file)
+
+# Export the cleaned data - previous export
+#write.xlsx(IVIG, file = "IVIG_cleaned.xlsx")
