@@ -1,0 +1,217 @@
+# Load ggplot2
+library(ggplot2)
+library(ggrepel)
+
+# Count the number of age group
+df_age <- as.data.frame(table(IVIG$AgeGroup))
+colnames(df_age) <- c("response", "count")
+
+# Map binary values to meaningful labels
+df_age$response <- factor(df_age$response,
+                          levels = c("Adolescent", "Adult"),
+                          labels = c("Adolescent", "Adult"))
+
+# Calculate proportion and labels
+df_age$prop <- df_age$count / sum(df_age$count)
+df_age$label <- paste0("N = ", df_age$count, 
+                        "\n ", round(df_age$prop * 100, 1), "%")
+# Plot
+ggplot(df_age, aes(x = "", y = count, fill = response)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  theme_void() +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c("lightblue", "steelblue")) +
+  labs(title = "Age Group", fill = "Key")  +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.position = "right",
+    legend.justification = "center",
+    legend.title = element_text(size = 12),
+    legend.box.margin = margin(t = 0, r = 0, b = 0, l = -10),  # Pull legend toward plot
+    plot.margin = margin(t = 10, r = 40, b = 10, l = 10)       # Add space around whole plot
+  )
+
+# Count the number of % covered by insurance w NAs
+df_coverage <- as.data.frame(table(
+  IVIG$`Please specify the percentage of IVIG treatment costs (including both medication and administration) covered by the patient‚Äôs insurance. Make an estimate if you are not entirely certain.`,
+  useNA = "ifany"
+))
+colnames(df_coverage) <- c("response", "count")
+
+# Convert factor and relabel
+df_coverage$response <- as.character(df_coverage$response)
+df_coverage$response[df_coverage$response == "0"] <- "Minimal"
+df_coverage$response[df_coverage$response == "1"] <- "Substantial"
+df_coverage$response[is.na(df_coverage$response)] <- "Not Listed"
+df_coverage$response <- factor(df_coverage$response,
+                               levels = c("Minimal", "Substantial", "Not Listed"))
+
+# Calculate proportions
+df_coverage$prop <- df_coverage$count / sum(df_coverage$count)
+
+# Create clean labels
+df_coverage$label <- paste0("N = ", df_coverage$count,
+                            "\n", round(df_coverage$prop * 100, 1), "%")
+
+# Plot
+ggplot(df_coverage, aes(x = "", y = count, fill = response)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  theme_void() +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c("pink", "lightgreen", "grey")) +
+  labs(title = "Insurance Coverage", fill = "Key")  +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.position = "right",
+    legend.justification = "center",
+    legend.title = element_text(size = 12),
+    legend.box.margin = margin(t = 0, r = 0, b = 0, l = -10),  # Pull legend toward plot
+    plot.margin = margin(t = 10, r = 40, b = 10, l = 10)       # Add space around whole plot
+  )
+
+# Count the number of 0s and 1s for Finished
+df_finished <- as.data.frame(table(IVIG$Finished))
+colnames(df_finished) <- c("response", "count")
+
+# Map binary values to meaningful labels
+df_finished$response <- factor(df_finished$response,
+                               levels = c(0, 1),
+                               labels = c("Unfinished (<100%)", "Finished (100%)"))
+
+# Calculate proportion and labels
+df_finished$prop <- df_finished$count / sum(df_finished$count)
+df_finished$label <- paste0("N = ", df_finished$count, 
+                            "\n", round(df_finished$prop * 100, 1), "%")
+
+# Plot
+ggplot(df_finished, aes(x = 2, y = count, fill = response)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y", start=0) +
+  theme_void() +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c("lightcoral", "lightgreen")) +
+  labs(title = "Completion Status", fill = "Key") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.position = "right",
+    legend.justification = "center",
+    legend.title = element_text(size = 12),
+    legend.box.margin = margin(t = 0, r = 0, b = 0, l = -10),  # Pull legend toward plot
+    plot.margin = margin(t = 10, r = 40, b = 10, l = 10)       # Add space around whole plot
+  )
+
+#now work with the progress %
+IVIG$Progress <- as.numeric(IVIG$Progress)
+
+IVIG$progress_bin <- cut(
+  IVIG$Progress,  # Change to your actual column name
+  breaks = c(0, 20, 40, 60, 80, 100),
+  labels = c("0–19", "20–39", "40–59", "60–79", "80–100"),
+  include.lowest = TRUE,
+  right = FALSE
+)
+
+# Count how many in each bin
+df_progress <- as.data.frame(table(IVIG$progress_bin))
+colnames(df_progress) <- c("ProgressBin", "Count")
+
+# view % progress as a bar graph
+ggplot(df_progress, aes(x = ProgressBin, y = Count, fill = ProgressBin)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  geom_text(aes(label = Count), vjust = -0.5, size = 5) +
+  scale_fill_brewer(palette = "YlGnBu") +  # you can customize or use manual colors
+  labs(
+    title = "Distribution of % Progress",
+    x = "% Progress on Full IVIG Survey",
+    y = "Number of Responses",
+    fill = "Progress"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    legend.position = "none"
+  )
+
+################## turned the below into a function - plot_grouped_pie
+#more complex pie graphs
+# Get all relevant columns by exact quote
+pattern <- "^What condition\\(s\\) has your child been diagnosed with \\(select all that apply\\)\\? - "
+condition_cols <- grep(pattern, colnames(IVIG), value = TRUE)
+
+# Extract diagnosis names
+diagnoses <- sub(".*-\\s*", "", condition_cols)
+
+# Count selections
+diagnosis_counts <- sapply(condition_cols, function(col) {
+  sum(IVIG[[col]] == 1)
+})
+names(diagnosis_counts) <- diagnoses
+
+# Create initial dataframe
+df_diag <- data.frame(
+  diagnosis = names(diagnosis_counts),
+  count = as.numeric(diagnosis_counts)
+)
+
+# Group rare diagnoses (count == 1) into "Other (N = 1)"
+df_diag$diagnosis_grouped <- ifelse(
+  df_diag$count == 1, 
+  "Other, all where N = 1", 
+  as.character(df_diag$diagnosis)
+)
+# Aggregate the grouped data
+df_diag_grouped <- aggregate(count ~ diagnosis_grouped, data = df_diag, sum)
+names(df_diag_grouped) <- c("diagnosis", "count")
+
+# Remove 0-count rows (if any)
+df_diag_grouped <- subset(df_diag_grouped, count > 0)
+
+# Pie labels (exclude Other)
+df_diag_grouped$label <- ifelse(
+  df_diag_grouped$diagnosis == "Other, all where N = 1", 
+  "", 
+  paste0(round(df_diag_grouped$prop * 100, 1), "%")
+)
+
+# Legend labels
+df_diag_grouped$legend_label <- ifelse(
+  df_diag_grouped$diagnosis == "Other, all where N = 1",
+  paste0("Other, all where N = 1 (N = ", df_diag_grouped$count[df_diag_grouped$diagnosis == "Other, all where N = 1"], ")"),
+  paste0(df_diag_grouped$diagnosis, " (N = ", df_diag_grouped$count, ")")
+)
+
+# Order slices by count descending, but keep "Other" last in legend
+ordered_levels <- c(
+  df_diag_grouped$legend_label[df_diag_grouped$diagnosis != "Other, all where N = 1"]
+  [order(-df_diag_grouped$count[df_diag_grouped$diagnosis != "Other, all where N = 1"])],
+  df_diag_grouped$legend_label[df_diag_grouped$diagnosis == "Other, all where N = 1"]
+)
+
+df_diag_grouped$legend_label <- factor(df_diag_grouped$legend_label, levels = ordered_levels)
+
+# Proportions for pie and % labels
+df_diag_grouped$prop <- df_diag_grouped$count / sum(df_diag_grouped$count)
+df_diag_grouped$label <- ifelse(
+  df_diag_grouped$diagnosis == "Other, all where N = 1", 
+  "", 
+  paste0(round(df_diag_grouped$prop * 100, 1), "%")
+)
+
+# Plot
+ggplot(df_diag_grouped, aes(x = "", y = count, fill = legend_label)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y") +
+  theme_void() +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5), size = 4) +
+  labs(title = "Reported Diagnoses", fill = "Diagnosis") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.position = "right"
+  )
+
+# Show what's in the Other group
+cat("Diagnoses grouped into 'Other, all where N = 1':\n")
+cat(paste("- ", subset(df_diag, diagnosis_grouped == "Other, all where N = 1")$diagnosis), sep = "\n")
+####################
