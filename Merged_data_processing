@@ -1,0 +1,184 @@
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(ggrepel)  # Needed for smart label placement
+
+#Merged data processing
+# Set working directory and load merged data
+setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/IVIG/Merged")
+allIVIG <- read_excel("final_merged_data.xlsx", sheet = 1)
+
+allIVIG <- allIVIG[-1, ]  # Remove the first row
+
+#categorize the responses based on the number of rows
+n_participants <- nrow(allIVIG)
+
+#working to plot the ages of merged data
+# Clean age column in case it's still a character
+allIVIG$age <- as.numeric(allIVIG$age)
+
+# Compute summary stats
+age_summary <- allIVIG %>%
+  summarize(
+    median_age = median(age, na.rm = TRUE),
+    mean_age = mean(age, na.rm = TRUE),
+    min_age = min(age, na.rm = TRUE),
+    max_age = max(age, na.rm = TRUE)
+  )
+
+# Calculate the percentage for each age
+age_data <- allIVIG %>%
+  count(age) %>%
+  mutate(percentage = n / n_participants * 100)
+
+# Build the legend string
+legend_text <- paste0(
+  "N = ", n_participants,
+  " | Median = ", age_summary$median_age,
+  " | Mean = ", round(age_summary$mean_age, 1),
+  " | Range = ", age_summary$min_age, "–", age_summary$max_age
+)
+
+# Custom color: deeper purple
+purple <- '#4B0082'
+mediumslateblue <- "#7B68EE"
+
+# Now plot and sort age from youngest to oldest
+ggplot(age_data, aes(x = percentage, y = factor(age, levels = rev(sort(unique(age)))))) +
+  # "Shadow" layer: slightly offset gray bar underneath
+  geom_bar(aes(x = percentage - 0.9), stat = "identity", fill = "gray30", width = 0.6) +
+  
+  # Main bar layer
+  geom_bar(stat = "identity", fill = mediumslateblue, color = "white", width = 0.6) +
+  
+  # Percentage labels
+  geom_text(aes(label = paste0(round(percentage), "%")), 
+            hjust = -0.2, size = 3.5, color = "black", fontface = "bold") +
+  
+  # Labels and title
+  labs(
+    title = "Age Distribution for IVIG",
+    x = NULL,
+    y = "Age of Patients",
+    caption = legend_text
+  ) +
+  xlim(0, max(age_data$percentage) + 10) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),  # Fully centered
+    plot.title.position = "plot",  # Ensure title is centered across full plot width
+    panel.grid = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_line(color = "black"),
+    axis.line.y = element_line(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.title.y = element_text(angle = 0, vjust = 0.5, hjust = 1),
+    plot.caption = element_text(hjust = 0, size = 9, margin = margin(t = 12))
+  )
+
+#donut plot for OOP Max
+#simplify the name
+colnames(allIVIG)[colnames(allIVIG) == "please_specify_the_out_of_pocket_oop_maximum_of_the_patient_aos_plan"] <- "OOPMax"
+allIVIG$OOPMax_num <- as.numeric(allIVIG$OOPMax)
+
+allIVIG <- allIVIG %>%
+  mutate(OOPMax_bin = case_when(
+    is.na(OOPMax_num) ~ "N/A",
+    OOPMax_num >= 0    & OOPMax_num <= 2999   ~ "$0–$2,999",
+    OOPMax_num >= 3000 & OOPMax_num <= 5999   ~ "$3,000–$5,999",
+    OOPMax_num >= 6000 & OOPMax_num <= 8999   ~ "$6,000–$8,999",
+    OOPMax_num >= 9000 & OOPMax_num <= 15000  ~ "$9,000–$15,000",
+    OOPMax_num >= 15001                       ~ "$15,000+",
+    TRUE ~ "Other"
+  ))
+
+desired_order <- c(
+  "$0–$2,999",
+  "$3,000–$5,999",
+  "$6,000–$8,999",
+  "$9,000–$15,000",
+  "$15,000+",
+  "N/A"
+)
+allIVIG$OOPMax_bin <- factor(allIVIG$OOPMax_bin, levels = desired_order)
+
+# Count the bins and percent with midpoint before splitting
+oop_data_full <- allIVIG %>%
+  count(OOPMax_bin) %>%
+  mutate(
+    percent = n / sum(n) * 100,
+    label = paste0(OOPMax_bin, "\n(", round(percent), "%)"),
+    cumulative = cumsum(n),
+    midpoint = cumulative - n / 2
+  )
+
+# Split for labeling
+oop_data_inside <- oop_data_full %>% filter(OOPMax_bin != "$15,000+")
+oop_data_outside <- oop_data_full %>% filter(OOPMax_bin == "$15,000+")
+
+# Purple → blue gradient with grey for N/A
+custom_colors <- c(
+  "$0–$2,999"     = "#d0b3e1",  # light lavender
+  "$3,000–$5,999" = "#b79dd1",
+  "$6,000–$8,999" = "#8c74b8",
+  "$9,000–$15,000"= "#5b4da0",
+  "$15,000+"      = "#283a8e",  # dark blue
+  "N/A"           = "#d9d9d9"   # grey
+)
+
+ggplot(oop_data_full, aes(x = 2, y = n, fill = OOPMax_bin)) +
+  geom_col(color = "white", width = 1) +
+  coord_polar(theta = "y", clip = "off") +
+  xlim(0.5, 2.5) +  # Not too wide — prevents big stretching
+  ylim(0, sum(oop_data_full$n)) +
+  
+  # Inside labels
+  geom_text(
+    data = oop_data_inside,
+    aes(label = label),
+    position = position_stack(vjust = 0.5),
+    size = 3.3,
+    color = "black"
+  ) +
+  
+  # Outside label for $15,000+
+  geom_text_repel(
+    data = oop_data_outside,
+    aes(label = label, y = midpoint),
+    x = 2.7,
+    nudge_x = 0.3,
+    direction = "y",
+    segment.color = "black",
+    segment.size = 0.5,
+    size = 3.5,
+    show.legend = FALSE,
+    inherit.aes = FALSE
+  ) +
+  
+  # N in center of donut
+  annotate("text", x = 1.5, y = 0,
+           #couldnt get the alignment so I added \n
+           label = paste0("\n\n\n\n\n\n\n\nN = ", nrow(allIVIG)),
+           size = 5, fontface = "bold") +
+  
+  #styling
+  scale_fill_manual(values = custom_colors, drop = FALSE) +
+  labs(
+    title = "Out-of-Pocket Maximum Distribution",
+    fill = "Range"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 14,
+      margin = margin(t = 0, b = -25)
+    ),
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 10),
+    plot.margin = margin(t = 20, r = 20, b = 20, l = 20)  # adds just enough room
+  )
+
