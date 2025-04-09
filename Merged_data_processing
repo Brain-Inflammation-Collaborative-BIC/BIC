@@ -40,8 +40,9 @@ legend_text <- paste0(
   " | Range = ", age_summary$min_age, "–", age_summary$max_age
 )
 
-# Custom color: deeper purple
+# Custom colors
 purple <- '#4B0082'
+medpurple <-'#8c74b8'
 mediumslateblue <- "#7B68EE"
 
 # Now plot and sort age from youngest to oldest
@@ -50,7 +51,7 @@ ggplot(age_data, aes(x = percentage, y = factor(age, levels = rev(sort(unique(ag
   geom_bar(aes(x = percentage - 0.9), stat = "identity", fill = "gray30", width = 0.6) +
   
   # Main bar layer
-  geom_bar(stat = "identity", fill = mediumslateblue, color = "white", width = 0.6) +
+  geom_bar(stat = "identity", fill = medpurple, color = "white", width = 0.6) +
   
   # Percentage labels
   geom_text(aes(label = paste0(round(percentage), "%")), 
@@ -160,7 +161,7 @@ ggplot(oop_data_full, aes(x = 2, y = n, fill = OOPMax_bin)) +
   # N in center of donut
   annotate("text", x = 1.5, y = 0,
            #couldnt get the alignment so I added \n
-           label = paste0("\n\n\n\n\n\n\n\nN = ", nrow(allIVIG)),
+           label = paste0("\n\n\n\n\n\n\nN = ", nrow(allIVIG)),
            size = 5, fontface = "bold") +
   
   #styling
