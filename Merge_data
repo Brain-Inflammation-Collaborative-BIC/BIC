@@ -1,0 +1,134 @@
+library(readxl)
+library(dplyr)
+library(openxlsx)
+library(janitor)
+setwd("/Users/jameshunt/Desktop/BIC Data/")
+
+# Load datasets
+ND <- read_excel("IVIG_cleaned_3_31_25.xlsx")
+OD <- read_excel("UNHIDE_Trial.xlsx")
+
+# Clean names for ND
+ND <- ND %>% clean_names()
+
+# Step 1: Select and transform OD columns to match ND structure
+OD_to_merge <- OD %>%
+
+# Rename ID column to match ND
+  rename(response_id = Participant) %>%
+  
+# Select all desired columns from OD
+  select(
+    response_id,
+    
+# Unique OD columns to keep
+    `Recommendation from HCP_decode`,
+    `Personal Research_decode`,
+    `Advice_decode`,
+    `Previous Treatments Tried_decode`,
+    `Availabiltiy of IVG Options_decode`,
+    `Insurance coverage and financial_decode`,
+    `Outcome and Benefits_decode`,
+    `Conserns about side-effects_decode`,
+    REASONIVIG,
+    `Type of HCP`,
+    `Type of HCP_decode`,
+    `Other Type HCP`,
+    `Wait time for 1st IVIG`,
+    `Wait categories`,
+    `Age of first IVIG`,
+    `Weight at First IVIG`,
+    `Cycles undergon 6 months`,
+    `IVIG Frequency`,
+    `IVIG Dose`,
+    `Deductable NA`,
+    `OOP 3 mo before IVIG RX`,
+    `Waiting between RX and first IVIG`,
+    `6 Mo Period after First IVIG`,
+    
+    # Original insurance columns (will be transformed)
+    `# Month before IVIG_Interval_Insurance_1`,  # PPO before
+    `# Month before IVIG_Interval_Insurance_2`,  # HMO before
+    `# Month before IVIG_Interval_Insurance_4`,  # HDHP before
+    `# Month before IVIG_Interval_Insurance_5`,  # HSA before
+    `# Month before IVIG_Interval_Insurance_8`,  # Medicaid before
+    `# Month before IVIG_Interval_Insurance_12`, # Other before
+    
+    `#Waiting PeriodVIG_Interval_Insurance_1`,   # PPO waiting
+    `#Waiting PeriodVIG_Interval_Insurance_2...47`,   # HMO waiting
+    `#Waiting PeriodVIG_Interval_Insurance_4`,   # HDHP waiting
+    `#Waiting PeriodVIG_Interval_Insurance_5`,   # HSA waiting
+    `#Waiting PeriodVIG_Interval_Insurance_8`,   # Medicaid waiting
+    `#Waiting PeriodVIG_Interval_Insurance_12`,  # Other waiting
+    
+    `6 Months After First IVIGVIG_Interval_Insurance_1`,  # PPO after
+    `6_Months VIG_Interval_Insurance_2`,         # HMO after
+    `6_Months VIG_Interval_Insurance_4`,         # HDHP after
+    `6_Months VIG_Interval_Insurance_5`,         # HSA after
+    `6_Months VIG_Interval_Insurance_8`,         # Medicaid after
+    `6_Months VIG_Interval_Insurance_12`         # Other after
+  ) %>%
+  
+  # Step 2: Transform insurance variables to match ND format
+  mutate(
+    # Before IVIG Period
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_ppo_preferred_provider_organization_3_month_period_before_ivig_prescription" = 
+      as.integer(`# Month before IVIG_Interval_Insurance_1` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hmo_health_maintenance_organization_3_month_period_before_ivig_prescription" = 
+      as.integer(`# Month before IVIG_Interval_Insurance_2` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hdhp_high_deductible_health_plan_3_month_period_before_ivig_prescription" = 
+      as.integer(`# Month before IVIG_Interval_Insurance_4` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hsa_health_savings_account_3_month_period_before_ivig_prescription" = 
+      as.integer(`# Month before IVIG_Interval_Insurance_5` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_federal_insurance_medicaid_3_month_period_before_ivig_prescription" = 
+      as.integer(`# Month before IVIG_Interval_Insurance_8` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_other_please_specify_below_3_month_period_before_ivig_prescription" = 
+      as.integer(`# Month before IVIG_Interval_Insurance_12` == 1),
+    
+    # Waiting Period
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_ppo_preferred_provider_organization_waiting_period_between_prescription_and_first_ivig_treatment" = 
+      as.integer(`#Waiting PeriodVIG_Interval_Insurance_1` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hmo_health_maintenance_organization_waiting_period_between_prescription_and_first_ivig_treatment" = 
+      as.integer(`#Waiting PeriodVIG_Interval_Insurance_2...47` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hdhp_high_deductible_health_plan_waiting_period_between_prescription_and_first_ivig_treatment" = 
+      as.integer(`#Waiting PeriodVIG_Interval_Insurance_4` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hsa_health_savings_account_waiting_period_between_prescription_and_first_ivig_treatment" = 
+      as.integer(`#Waiting PeriodVIG_Interval_Insurance_5` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_federal_insurance_medicaid_waiting_period_between_prescription_and_first_ivig_treatment" = 
+      as.integer(`#Waiting PeriodVIG_Interval_Insurance_8` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_other_please_specify_below_waiting_period_between_prescription_and_first_ivig_treatment" = 
+      as.integer(`#Waiting PeriodVIG_Interval_Insurance_12` == 1),
+    
+    # After IVIG Period
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_ppo_preferred_provider_organization_6_month_period_after_first_ivig_treatment" = 
+      as.integer(`6 Months After First IVIGVIG_Interval_Insurance_1` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hmo_health_maintenance_organization_6_month_period_after_first_ivig_treatment" = 
+      as.integer(`6_Months VIG_Interval_Insurance_2` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hdhp_high_deductible_health_plan_6_month_period_after_first_ivig_treatment" = 
+      as.integer(`6_Months VIG_Interval_Insurance_4` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_private_insurance_hsa_health_savings_account_6_month_period_after_first_ivig_treatment" = 
+      as.integer(`6_Months VIG_Interval_Insurance_5` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_federal_insurance_medicaid_6_month_period_after_first_ivig_treatment" = 
+      as.integer(`6_Months VIG_Interval_Insurance_8` == 1),
+    "please_indicate_the_type_s_of_health_insurance_or_financial_assistance_that_the_patient_had_in_each_interval_if_the_patient_had_no_health_insurance_select_ao_no_insurance_ao_if_you_are_viewing_on_mobile_you_may_need_to_scroll_to_the_right_to_view_all_options_other_please_specify_below_6_month_period_after_first_ivig_treatment" = 
+      as.integer(`6_Months VIG_Interval_Insurance_12` == 1)
+    
+  ) %>%
+  
+  # Remove original insurance columns
+  select(-matches("^# Month before|^#Waiting Period|^6 Months After|^6_Months")) %>%
+  
+  # Clean names for OD_to_merge
+  clean_names() %>%
+  
+  # Convert all insurance indicator columns to character to match ND
+  mutate(across(
+    matches("please_indicate_the_type_s_of_health_insurance"),
+    as.character
+  ))
+
+# Now merge should work
+combined <- bind_rows(ND, OD_to_merge)
+
+# Save to Excel
+write.xlsx(combined, file = "final_merged_data.xlsx")
