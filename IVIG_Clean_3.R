@@ -76,6 +76,15 @@ IVIG$Age <- as.numeric(as.character(IVIG$Age))
 IVIG$AgeGroup <- ifelse(IVIG$Age < 18, "Adolescent", "Adult")
 #print(head(IVIG))
 
+#this is age at first IVIG - simplify name
+IVIG <- IVIG %>%
+  rename(AgeAtFirstIVIG = "How many years old was the patient when they received their first round of IVIG treatment?") 
+# Convert Age from factor to numeric
+IVIG$AgeAtFirstIVIG <- as.numeric(as.character(IVIG$AgeAtFirstIVIG))
+
+#calculate differences in these ages
+IVIG$AgeChange <- IVIG$Age - IVIG$AgeAtFirstIVIG
+
 # Reverse geocode latitude and longitude
 IVIG <- IVIG %>%
   reverse_geocode(
