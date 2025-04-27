@@ -5,7 +5,7 @@ library(janitor)
 setwd("/Users/jameshunt/Desktop/BIC Data/")
 
 # Load datasets
-ND <- read_excel("IVIG_cleaned_3_31_25.xlsx")
+ND <- read_excel("IVIG_cleaned_042125.xlsx")
 OD <- read_excel("UNHIDE_Trial.xlsx")
 
 # Clean names for ND
@@ -13,15 +13,15 @@ ND <- ND %>% clean_names()
 
 # Step 1: Select and transform OD columns to match ND structure
 OD_to_merge <- OD %>%
-
-# Rename ID column to match ND
+  # Rename ID column to match ND
   rename(response_id = Participant) %>%
   
-# Select all desired columns from OD
+  # Select all desired columns from OD
   select(
     response_id,
     
-# Unique OD columns to keep
+  
+    # Unique OD columns to keep
     `Recommendation from HCP_decode`,
     `Personal Research_decode`,
     `Advice_decode`,
@@ -45,6 +45,49 @@ OD_to_merge <- OD %>%
     `OOP 3 mo before IVIG RX`,
     `Waiting between RX and first IVIG`,
     `6 Mo Period after First IVIG`,
+    # Add all QoL columns (they have the same names in both datasets)
+    # Patient QoL - Before IVIG
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The patients overall quality of life. Consider daily functioning, happiness, and life satisfaction.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The patients physical and emotional well-being. Consider health status, mood, and emotional resilience.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - Quantity and quality of the patients social interactions. Consider the ease of engaging with others and participation in social activities.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The patients educational or work performance. Consider the ease of completing assignments and managing workload.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The patient‚Äôs engagement in daily life activities and personal interests. Consider leisure activities, hobbies, and any prior routines.`,
+    
+    # Patient QoL - Waiting Period
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The patients overall quality of life. Consider daily functioning, happiness, and life satisfaction.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The patients physical and emotional well-being. Consider health status, mood, and emotional resilience.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - Quantity and quality of the patients social interactions. Consider the ease of engaging with others and participation in social activities.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The patients educational or work performance. Consider the ease of completing assignments and managing workload.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The patient‚Äôs engagement in daily life activities and personal interests. Consider leisure activities, hobbies, and any prior routines.`,
+    
+    # Patient QoL - After IVIG
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After IVIG Prescription - The patients overall quality of life. Consider daily functioning, happiness, and life satisfaction.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After IVIG Prescription - The patients physical and emotional well-being. Consider health status, mood, and emotional resilience.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After IVIG Prescription - Quantity and quality of the patients social interactions. Consider the ease of engaging with others and participation in social activities.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After IVIG Prescription - The patients educational or work performance. Consider the ease of completing assignments and managing workload.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After IVIG Prescription - The patient‚Äôs engagement in daily life activities and personal interests. Consider leisure activities, hobbies, and any prior routines.`,
+    
+    # Family QoL - Before IVIG
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The Family/Caretaker/Cohabitant‚Äôs overall quality of life. Consider daily functioning, happiness, and life satisfaction.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The Family/Caretaker/Cohabitant‚Äôs physical and emotional well-being. Consider health status, mood, and emotional resilience.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - Quantity and quality of the Family/Caretaker/Cohabitant‚Äôs social interactions. Consider the ease of engaging with others and participation in social activities.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The Family/Caretaker/Cohabitant‚Äôs work performance. Consider the ease of attending work and managing workload.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 3-Month Period Before IVIG Prescription - The Family/Caretaker/Cohabitant‚Äôs engagement in daily life activities and personal interests. Consider leisure activities, hobbies, and any prior routines.`,
+    
+    # Family QoL - Waiting Period
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The Family/Caretaker/Cohabitant‚Äôs overall quality of life. Consider daily functioning, happiness, and life satisfaction.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The Family/Caretaker/Cohabitant‚Äôs physical and emotional well-being. Consider health status, mood, and emotional resilience.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - Quantity and quality of the Family/Caretaker/Cohabitant‚Äôs social interactions. Consider the ease of engaging with others and participation in social activities.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The Family/Caretaker/Cohabitant‚Äôs work performance. Consider the ease of attending work and managing workload.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - Waiting Period (Between prescription and first IVIG treatment) - The Family/Caretaker/Cohabitant‚Äôs engagement in daily life activities and personal interests. Consider leisure activities, hobbies, and any prior routines.`,
+    
+    # Family QoL - After IVIG
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After First IVIG Treatment - The Family/Caretaker/Cohabitant‚Äôs overall quality of life. Consider daily functioning, happiness, and life satisfaction.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After First IVIG Treatment - The Family/Caretaker/Cohabitant‚Äôs physical and emotional well-being. Consider health status, mood, and emotional resilience.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After First IVIG Treatment - Quantity and quality of the Family/Caretaker/Cohabitant‚Äôs social interactions. Consider the ease of engaging with others and participation in social activities.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After First IVIG Treatment - The Family/Caretaker/Cohabitant‚Äôs work performance. Consider the ease of attending work and managing workload.`,
+    `Please rate each aspect of quality of life (QoL) across the three different time intervals: Pre-P... - 6-Month Period After First IVIG Treatment - The Family/Caretaker/Cohabitant‚Äôs engagement in daily life activities and personal interests. Consider leisure activities, hobbies, and any prior routines.`,
+    
     
     # Original insurance columns (will be transformed)
     `# Month before IVIG_Interval_Insurance_1`,  # PPO before
@@ -126,9 +169,25 @@ OD_to_merge <- OD %>%
     matches("please_indicate_the_type_s_of_health_insurance"),
     as.character
   ))
+# After cleaning names but before bind_rows(), add this:
+OD_to_merge <- OD_to_merge %>%
+  # Convert all QoL columns to character to match ND (or vice versa)
+  mutate(across(
+    starts_with("please_rate_each_aspect_of_quality_of_life"),
+    as.character
+  ))
+
+# Similarly ensure ND has the same type (if needed)
+ND <- ND %>%
+  mutate(across(
+    starts_with("please_rate_each_aspect_of_quality_of_life"),
+    as.character
+  ))
+
 
 # Now merge should work
 combined <- bind_rows(ND, OD_to_merge)
 
 # Save to Excel
 write.xlsx(combined, file = "final_merged_data.xlsx")
+write.xlsx(combined, file = "final_merged_data_NEW.xlsx")
