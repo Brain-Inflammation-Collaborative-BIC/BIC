@@ -85,6 +85,17 @@ IVIG$AgeAtFirstIVIG <- as.numeric(as.character(IVIG$AgeAtFirstIVIG))
 #calculate differences in these ages
 IVIG$AgeChange <- IVIG$Age - IVIG$AgeAtFirstIVIG
 
+#repair messed up 1-10 scale on influence to receive treatment questions
+#should be 1-10 but it's coming in as 5-14
+# Find columns by partial name match
+cols_to_adjust <- grep("Please rate the significance of each of the below factors in the decision to pursue IVIG treatment for PANS", names(IVIG))
+
+# Convert selected columns to numeric
+IVIG[, cols_to_adjust] <- lapply(IVIG[, cols_to_adjust], function(x) as.numeric(as.character(x)))
+
+# Subtract 4 from those columns
+IVIG[, cols_to_adjust] <- IVIG[, cols_to_adjust] - 4
+
 # Reverse geocode latitude and longitude
 IVIG <- IVIG %>%
   reverse_geocode(
