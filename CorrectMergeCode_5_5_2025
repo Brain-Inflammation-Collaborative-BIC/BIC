@@ -1,0 +1,109 @@
+# Load required libraries
+library(readxl)    # For reading Excel files
+library(dplyr)     # For data manipulation
+library(janitor)   # For data cleaning functions
+library(openxlsx)  # For writing Excel files
+
+# Set working directory to location of data files
+setwd("/Users/jameshunt/Desktop/BIC Data/")
+
+#-------------------------------------------------------------------------------
+# DATA LOADING AND INITIAL CLEANING
+#-------------------------------------------------------------------------------
+
+# Load and clean New Data (ND) - remove special characters/spaces from column names
+ND <- read_excel("IVIG_cleaned_042125.xlsx") %>% clean_names()
+
+# Load and clean Old Data (OD) - standardize participant ID column name
+OD <- read_excel("Trial_4_28_column_names.xlsx") %>% 
+  clean_names() %>% 
+  rename(response_id = participant)
+
+#-------------------------------------------------------------------------------
+# DATA STANDARDIZATION FUNCTIONS
+#-------------------------------------------------------------------------------
+
+# Standardize insurance columns across datasets (handle mixed numeric/character types)
+standardize_insurance_columns <- function(data) {
+  # Identify all columns containing 'insurance' in their name (case insensitive)
+  insurance_cols <- names(data)[grepl("insurance", names(data), ignore.case = TRUE)]
+  
+  # Process each insurance column to ensure consistent data type
+  data %>%
+    mutate(across(
+      any_of(insurance_cols),
+      ~ {
+        # First attempt to convert to numeric
+        num_val <- suppressWarnings(as.numeric(.))
+        
+        # If conversion fails (all NA), keep original as character
+        if (all(is.na(num_val))) {
+          as.character(.)
+        } else {
+          num_val
+        }
+      }
+    ))
+}
+
+# Standardize both datasets using the insurance function
+ND <- ND %>% standardize_insurance_columns()
+OD <- OD %>% standardize_insurance_columns()
+
+# Convert common numeric/QoL columns to proper numeric format
+convert_common_columns <- function(data) {
+  data %>%
+    # Handle Quality of Life rating columns (extract numbers if needed)
+    mutate(across(
+      matches("please_rate_each_aspect_of_quality_of_life"),
+      ~ {
+        num <- suppressWarnings(as.numeric(.))
+        ifelse(is.na(num), suppressWarnings(as.numeric(gsub("[^0-9.]", "", .))), num)
+      }
+    )) %>%
+    # Convert all other specified numeric columns
+    mutate(across(
+      c(
+        matches("how_long_in_months"),
+        matches("including_the_very_first_infusion"),
+        matches("how_many_years_old"),
+        matches("how_much_did_the_patient_weigh"),
+        matches("please_rate_the_significance"),
+        matches("please_specify_the_out_of_pocket"),
+        matches("please_input_the_total_out_of_pocket"),
+        matches("financial.*strain"),
+        matches("deductible")
+      ),
+      ~ suppressWarnings(as.numeric(.))
+    ))
+}
+
+# Apply numeric conversion to both datasets
+ND <- ND %>% convert_common_columns()
+OD <- OD %>% convert_common_columns()
+
+#-------------------------------------------------------------------------------
+# DATA MERGING
+#-------------------------------------------------------------------------------
+
+# Identify columns common to both datasets
+common_cols <- intersect(names(ND), names(OD))
+
+# Select only common columns from OD for merging
+OD_to_merge <- OD %>% select(all_of(common_cols))
+
+# Combine datasets - all ND data with new records from OD
+combined <- bind_rows(ND, OD_to_merge)
+
+# For duplicate response_ids, keep the first occurrence (prioritizes ND data)
+combined <- combined %>%
+  group_by(response_id) %>%
+  filter(if (n() > 1) row_number() == 1 else TRUE) %>%
+  ungroup()
+
+#-------------------------------------------------------------------------------
+# OUTPUT RESULTS
+#-------------------------------------------------------------------------------
+
+# Save merged dataset to Excel file
+write.xlsx(combined, "final_merged_data.xlsx")
