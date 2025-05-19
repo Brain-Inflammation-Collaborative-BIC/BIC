@@ -96,6 +96,32 @@ IVIG[, cols_to_adjust] <- lapply(IVIG[, cols_to_adjust], function(x) as.numeric(
 # Subtract 4 from those columns
 IVIG[, cols_to_adjust] <- IVIG[, cols_to_adjust] - 4
 
+#adjust 1-10 scale on effectiveness before and after treatment
+#should be 1-10 but we have don't know and an NA that need to be adjusted
+# Find columns by partial name match
+cols_to_shift <- grep("On a scale of 1 to 10, where 1 indicates Not effective at all and 10 indicates Highly effective", names(IVIG))
+
+#keep don't know and N/A as Qualtrics asked
+IVIG[, cols_to_shift] <- lapply(IVIG[, cols_to_shift], function(x) {
+  x <- as.character(x)
+  
+  # Preserve labels
+  x[x == "1"] <- "don't know"
+  x[x == "12"] <- "N/A"
+  x[x == "13"] <- "N/A"
+  
+  # Work only with entries that are digits AND not "don't know"/"N/A"
+  suppressWarnings({
+    numeric_vals <- suppressWarnings(as.numeric(x))
+    # Find values that are numeric between 2 and 11 and make numeric
+    is_target <- !is.na(numeric_vals) & numeric_vals >= 2 & numeric_vals <= 11
+    # Subtract 1 from those columns - so they match and can be compared to trial kit
+    x[is_target] <- as.character(numeric_vals[is_target] - 1)
+  })
+  
+  return(factor(x))
+})
+                                 
 # Reverse geocode latitude and longitude
 IVIG <- IVIG %>%
   reverse_geocode(
