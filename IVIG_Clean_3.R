@@ -10,7 +10,7 @@ library(openxlsx)
 
 # Set working directory and load data - had to change to work with my icloud folder
 setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/IVIG/Qualtrics")
-IVIG <- read_excel("IVIGsurvey_3_31_25_values.xlsx")
+IVIG <- read_excel("IVIGsurvey_5_19_25_values.xlsx")
 
 # Clean up the data frame
 IVIG <- IVIG[-2, ]  # Remove the second row
@@ -37,8 +37,7 @@ print(duplicate_names)
 names(IVIG) <- make.unique(names(IVIG)) #check how this changes them
 
 #next check for the emails!
-#i saved the emails only as a new xlsx without a password 
-#- was having issues with using the password protected file in R
+#i saved the emails only as a new xlsx without a password - having issues that the password starts w 0
 file_path <- "previousIVIGemails.xlsx"
 df <- read_excel(file_path)
 # Extract the first column from row 2 to the end
@@ -67,6 +66,7 @@ IVIG <- IVIG[!matches, ]
 #categorize the responses based on the number of rows
 n <- nrow(IVIG)
 # Convert complex column name to Age
+# this is for Age at survey date
 IVIG <- IVIG %>%
   rename(Age = "How old is the patient?\r\n\r\n(REMINDER: If you are a parent or guardian answering on behalf of or alongside your child, please remember that they are the patient)") 
 # Convert Age from factor to numeric
@@ -194,8 +194,8 @@ IVIG <- IVIG %>%
     ~ replace(., is.na(.), 0)
      )) %>%
   mutate(across(
-      # If the patient had a private insurance columns
-      starts_with("If the patient‚Äôs healthcare insurance coverage changed across the three intervals"),
+    # If the patient had a private insurance columns
+    starts_with("If the patient‚Äôs healthcare insurance coverage changed across the three intervals"),
       ~ replace(., is.na(.), 0)
   )) %>%
   mutate(across(
