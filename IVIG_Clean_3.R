@@ -223,6 +223,93 @@ IVIG <- IVIG %>%
     ~ ifelse(. < 80, 0, 1)
   ))
 
+                                 
+# Identify the relevant columns by name - to calculate the correct denomenator for financial strats used
+strategy_cols <- grep(
+  "^Select all financial strategies employed to manage the costs of PANS treatment",
+  names(IVIG),
+  value = TRUE
+)
+
+# 1. Define your 3 sub-groups:
+before_cols  <- grep("3[- ]Month Period Before IVIG Prescription", 
+                     strategy_cols, value = TRUE)
+waiting_cols <- grep("Waiting Period", 
+                     strategy_cols, value = TRUE)
+after_cols   <- grep("6[- ]Month Period After First IVIG Treatment",
+                     strategy_cols, value = TRUE)
+
+# merge waiting+after for the post-treatment flag
+post_cols    <- c(waiting_cols, after_cols)
+
+# For each row, count how many strategies were selected (==1)
+#Build the two flags and tuck them in:
+IVIG <- IVIG %>%
+  mutate(
+    any_financial_strategy_beforetreatment = as.integer(
+      rowSums(across(all_of(before_cols),  ~ .x == 1), na.rm = TRUE) > 0
+    ),
+    any_financial_strategy_aftertreatment  = as.integer(
+      rowSums(across(all_of(post_cols),    ~ .x == 1), na.rm = TRUE) > 0
+    )
+  ) %>%
+  # place each new flag right after its source columns
+  relocate(any_financial_strategy_beforetreatment, .after = all_of(before_cols)) %>%
+  relocate(any_financial_strategy_aftertreatment,  .after = all_of(post_cols))
+
+# Identify the relevant columns by name - to calculate the correct denomenator for type of insurance
+healthinsurance_cols <- grep(
+  "Please indicate the type\\(s\\) of health insurance or financial assistance that the patient had in each interval",
+  names(IVIG),
+  value = TRUE
+)
+
+# 1. Define your 3 sub-groups:
+before_cols2  <- grep("3[- ]Month Period Before IVIG Prescription", 
+                     healthinsurance_cols, value = TRUE)
+waiting_cols2 <- grep("Waiting Period", 
+                     healthinsurance_cols, value = TRUE)
+after_cols2   <- grep("6[- ]Month Period After First IVIG Treatment",
+                     healthinsurance_cols, value = TRUE)
+
+# merge waiting+after for the post-treatment flag
+post_cols2    <- c(waiting_cols2, after_cols2)
+
+# For each row, count how many strategies were selected (==1)
+#Build the two flags and tuck them in:
+IVIG <- IVIG %>%
+  mutate(
+    any_healthinsurance_financialassistance_beforetreatment = as.integer(
+      rowSums(across(all_of(before_cols2),  ~ .x == 1), na.rm = TRUE) > 0
+    ),
+    any_healthinsurance_financialassistance_aftertreatment  = as.integer(
+      rowSums(across(all_of(post_cols2),    ~ .x == 1), na.rm = TRUE) > 0
+    )
+  ) %>%
+  # place each new flag right after its source columns
+  relocate(any_healthinsurance_financialassistance_beforetreatment, .after = all_of(before_cols2)) %>%
+  relocate(any_healthinsurance_financialassistance_aftertreatment,  .after = all_of(post_cols2))
+
+# Identify the relevant columns by name - to calculate the correct denomenator for work status
+work_cols <- grep(
+  "^What is your current work status?",
+  names(IVIG),
+  value = TRUE
+)
+# 2. For each row, count how many strategies were selected (==1)
+#    NA’s are treated as non-responses
+response_counts <- rowSums(IVIG[ , work_cols] == 1, na.rm = TRUE)
+
+# 3. Create a new 0/1 flag: 1 if they selected at least one strategy, else 0
+IVIG$any_work_status <- as.integer(response_counts > 0)
+
+#move the new columns to right after the questions - for easy viewing 
+IVIG <- IVIG %>%
+  mutate(
+    any_work_status        = as.integer(rowSums(across(all_of(work_cols),      ~ .x == 1), na.rm = TRUE) > 0)
+  ) %>%
+  relocate(any_work_status,        .after = all_of(work_cols))
+
 # Define columns_to_remove with exact column names from your dataset
 columns_to_remove <- c(
   "Start Date",
