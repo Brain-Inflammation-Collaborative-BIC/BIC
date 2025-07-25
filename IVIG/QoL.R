@@ -186,6 +186,13 @@ cat_labs <- c(
 )
 
 ##################################################################################################
+# prepare a tiny data.frame for the "Mean" header in each panel
+mean_header_df <- data.frame(
+  Category   = unique(plot_df$Category),
+  TimePeriod = factor("3-Month Before IVIG", levels = levels(plot_df$TimePeriod)),
+  label      = "Mean"
+)
+
 # Define your 10-step red→violet palette
 my_colors <- c(
   "#7f0000",  # 1
@@ -226,10 +233,20 @@ ggplot(plot_df, aes(
   geom_text(
     data        = mean_df,
     aes(y = TimePeriod, label = sprintf("%.1f", Mean)),
-    x           = 100,
-    hjust       = -0.1,
+    x           = 105,
+    hjust       = 0,
     inherit.aes = FALSE,
     size        = 3
+  ) +
+  
+  # one "Mean" header above the first bar in each facet
+  geom_text(
+    data        = mean_header_df,
+    aes(x = 106, y = TimePeriod, label = label),
+    inherit.aes = FALSE,
+    fontface    = "bold",
+    size        = 3,    
+    nudge_y     =  0.5   # <-- moves it up by 0.5 units
   ) +
   
   facet_wrap(
@@ -271,11 +288,357 @@ ggplot(plot_df, aes(
     legend.position    = "top",
     legend.title       = element_text(size = 8),
     legend.text        = element_text(size = 6),
+    plot.title         = element_text(hjust = 0.5, face = "bold"),
     strip.text         = element_text(face = "bold"),
     panel.grid         = element_blank(),
     panel.background   = element_blank()
   )
+###############################################################################################
+# Pull in the next question regex
+qpat <- question_patterns[["Physical & Emotional"]]
 
+# Rebuild the summary_list for Physical & Emotional
+summary_list_phys <- list()
+for(cat in names(category_patterns)) {
+  cpat <- category_patterns[[cat]]
+  for(tp_name in names(time_patterns)) {
+    tpat <- time_patterns[[tp_name]]
+    pat  <- paste0(tpat, ".*", cpat, ".*", qpat)
+    
+    cols <- grep(pat, qol_cols, ignore.case = TRUE, value = TRUE)
+    if (!length(cols)) next
+    
+    vals <- unlist(allIVIG[cols], use.names = FALSE) %>% as.numeric()
+    vals <- vals[!is.na(vals)]
+    
+    tab <- table(factor(vals, levels = 1:10))
+    pct <- as.numeric(tab) / sum(tab) * 100
+    mn  <- mean(vals)
+    
+    summary_list_phys[[ paste(cat, tp_name) ]] <-
+      data.frame(
+        Category   = cat,
+        TimePeriod = tp_name,
+        Rating     = 1:10,
+        Percent    = pct,
+        Mean       = mn
+      )
+  }
+}
+df_phys <- bind_rows(summary_list_phys)
+
+# Prep plotting data (filter, factor‐reorder, extract mean_df)
+plot_df_phys <- df_phys %>%
+  filter(!is.na(Percent) & Percent > 0) %>%
+  mutate(TimePeriod = factor(TimePeriod, levels = rev(time_lvls)))
+
+mean_df_phys <- df_phys %>%
+  distinct(Category, TimePeriod, Mean)
+
+# Re-use your ggplot code, swapping in *_phys
+ggplot(plot_df_phys, aes(
+  x    = Percent,
+  y    = TimePeriod,
+  fill = factor(Rating)
+)) +
+  geom_col(position = position_stack(reverse = TRUE), width = 0.6, na.rm = TRUE) +
+  geom_text(
+    aes(label = paste0(round(Percent), "%")),
+    position = position_stack(reverse = TRUE, vjust = 0.5),
+    size     = 2.5, color = "white"
+  ) +
+  geom_text(
+    data        = mean_df_phys,
+    aes(y = TimePeriod, label = sprintf("%.1f", Mean)),
+    x           = 105, hjust = 0, inherit.aes = FALSE, size = 3
+  ) +
+  geom_text(
+    data        = mean_header_df,
+    aes(x = 106, y = TimePeriod, label = label),
+    inherit.aes = FALSE, fontface = "bold", size = 3, nudge_y = 0.5
+  ) +
+  facet_wrap(~ Category, ncol = 1, labeller = as_labeller(cat_labs)) +
+  scale_x_continuous(breaks = NULL, labels = NULL, expand = c(0, 0)) +
+  coord_cartesian(xlim = c(0, 120), clip = "off") +
+  scale_fill_manual(
+    values = my_colors,
+    name   = "QoL Rating\nWhere 1 indicates 'Exceedingly Poor' and 10 indicates 'Exceedingly Good'",
+    guide  = guide_legend(title.position = "top", title.hjust = 0.5, nrow = 1)
+  ) +
+  labs(title = "Physical & Emotional Well Being", x = NULL, y = NULL) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(hjust = 0.5, face = "bold"),
+    legend.position  = "top",
+    legend.title     = element_text(size = 8),
+    legend.text      = element_text(size = 6),
+    strip.text       = element_text(face = "bold"),
+    panel.grid       = element_blank(),
+    panel.background = element_blank(),
+    plot.margin      = margin(5.5, 40, 5.5, 5.5)
+  )
+
+###############################################################################################
+# Pull the Social Interactions pattern
+qpat <- question_patterns[["Social Interactions"]]
+
+# Build the summary_list
+summary_list_si <- list()
+for(cat in names(category_patterns)) {
+  cpat <- category_patterns[[cat]]
+  for(tp_name in names(time_patterns)) {
+    tpat <- time_patterns[[tp_name]]
+    pat  <- paste0(tpat, ".*", cpat, ".*", qpat)
+    
+    cols <- grep(pat, qol_cols, ignore.case = TRUE, value = TRUE)
+    if (!length(cols)) next
+    
+    vals <- unlist(allIVIG[cols], use.names = FALSE) %>% as.numeric()
+    vals <- vals[!is.na(vals)]
+    
+    tab <- table(factor(vals, levels = 1:10))
+    pct <- as.numeric(tab) / sum(tab) * 100
+    mn  <- mean(vals)
+    
+    summary_list_si[[ paste(cat, tp_name) ]] <-
+      data.frame(
+        Category   = cat,
+        TimePeriod = tp_name,
+        Rating     = 1:10,
+        Percent    = pct,
+        Mean       = mn
+      )
+  }
+}
+df_si <- bind_rows(summary_list_si)
+
+# Prep the plotting and mean data.frames
+plot_df_si <- df_si %>%
+  filter(!is.na(Percent) & Percent > 0) %>%
+  mutate(TimePeriod = factor(TimePeriod, levels = rev(time_lvls)))
+
+mean_df_si <- df_si %>%
+  distinct(Category, TimePeriod, Mean)
+
+# 4. Draw the Social Interactions plot
+ggplot(plot_df_si, aes(
+  x    = Percent,
+  y    = TimePeriod,
+  fill = factor(Rating)
+)) +
+  geom_col(position = position_stack(reverse = TRUE), width = 0.6, na.rm = TRUE) +
+  geom_text(
+    aes(label = paste0(round(Percent), "%")),
+    position = position_stack(reverse = TRUE, vjust = 0.5),
+    size     = 2.5, color = "white"
+  ) +
+  geom_text(
+    data        = mean_df_si,
+    aes(y = TimePeriod, label = sprintf("%.1f", Mean)),
+    x           = 105, hjust = 0, inherit.aes = FALSE, size = 3
+  ) +
+  # re‐use the same "Mean" header above the first bar
+  geom_text(
+    data        = mean_header_df,
+    aes(x = 106, y = TimePeriod, label = label),
+    inherit.aes = FALSE, fontface = "bold", size = 3, nudge_y = 0.5
+  ) +
+  facet_wrap(~ Category, ncol = 1, labeller = as_labeller(cat_labs)) +
+  scale_x_continuous(breaks = NULL, labels = NULL, expand = c(0, 0)) +
+  coord_cartesian(xlim = c(0, 120), clip = "off") +
+  scale_fill_manual(
+    values = my_colors,
+    name   = "QoL Rating\nWhere 1 indicates 'Exceedingly Poor' and 10 indicates 'Exceedingly Good'",
+    guide  = guide_legend(title.position = "top", title.hjust = 0.5, nrow = 1)
+  ) +
+  labs(
+    title = "Social Interactions",
+    x     = NULL,
+    y     = NULL
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(hjust = 0.5, face = "bold"),
+    legend.position  = "top",
+    legend.title     = element_text(size = 8),
+    legend.text      = element_text(size = 6),
+    strip.text       = element_text(face = "bold"),
+    panel.grid       = element_blank(),
+    panel.background = element_blank(),
+    plot.margin      = margin(5.5, 40, 5.5, 5.5)
+  )
+
+###############################################################################################
+# Educational/Work Performance
+qpat <- question_patterns[["Educational/Work"]]
+
+summary_list_ew <- list()
+for(cat in names(category_patterns)) {
+  cpat <- category_patterns[[cat]]
+  for(tp_name in names(time_patterns)) {
+    tpat <- time_patterns[[tp_name]]
+    pat  <- paste0(tpat, ".*", cpat, ".*", qpat)
+    
+    cols <- grep(pat, qol_cols, ignore.case = TRUE, value = TRUE)
+    if (!length(cols)) next
+    
+    vals <- unlist(allIVIG[cols], use.names = FALSE) %>% as.numeric()
+    vals <- vals[!is.na(vals)]
+    
+    tab <- table(factor(vals, levels = 1:10))
+    pct <- as.numeric(tab) / sum(tab) * 100
+    mn  <- mean(vals)
+    
+    summary_list_ew[[ paste(cat, tp_name) ]] <-
+      data.frame(
+        Category   = cat,
+        TimePeriod = tp_name,
+        Rating     = 1:10,
+        Percent    = pct,
+        Mean       = mn
+      )
+  }
+}
+df_ew <- bind_rows(summary_list_ew)
+
+plot_df_ew <- df_ew %>%
+  filter(!is.na(Percent) & Percent > 0) %>%
+  mutate(TimePeriod = factor(TimePeriod, levels = rev(time_lvls)))
+
+mean_df_ew <- df_ew %>%
+  distinct(Category, TimePeriod, Mean)
+
+ggplot(plot_df_ew, aes(
+  x    = Percent,
+  y    = TimePeriod,
+  fill = factor(Rating)
+)) +
+  geom_col(position = position_stack(reverse = TRUE), width = 0.6, na.rm = TRUE) +
+  geom_text(
+    aes(label = paste0(round(Percent), "%")),
+    position = position_stack(reverse = TRUE, vjust = 0.5),
+    size     = 2.5, color = "white"
+  ) +
+  geom_text(
+    data        = mean_df_ew,
+    aes(y = TimePeriod, label = sprintf("%.1f", Mean)),
+    x           = 105, hjust = 0, inherit.aes = FALSE, size = 3
+  ) +
+  geom_text(
+    data        = mean_header_df,
+    aes(x = 106, y = TimePeriod, label = label),
+    inherit.aes = FALSE, fontface = "bold", size = 3, nudge_y = 0.5
+  ) +
+  facet_wrap(~ Category, ncol = 1, labeller = as_labeller(cat_labs)) +
+  scale_x_continuous(breaks = NULL, labels = NULL, expand = c(0, 0)) +
+  coord_cartesian(xlim = c(0, 120), clip = "off") +
+  scale_fill_manual(
+    values = my_colors,
+    name   = "QoL Rating\nWhere 1 indicates 'Exceedingly Poor' and 10 indicates 'Exceedingly Good'",
+    guide  = guide_legend(title.position = "top", title.hjust = 0.5, nrow = 1)
+  ) +
+  labs(
+    title = "Educational/Work Performance",
+    x     = NULL,
+    y     = NULL
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(hjust = 0.5, face = "bold"),
+    legend.position  = "top",
+    legend.title     = element_text(size = 8),
+    legend.text      = element_text(size = 6),
+    strip.text       = element_text(face = "bold"),
+    panel.grid       = element_blank(),
+    panel.background = element_blank(),
+    plot.margin      = margin(5.5, 40, 5.5, 5.5)
+  )
+###############################################################################################
+# Daily Activities
+
+qpat <- question_patterns[["Daily Activities"]]
+
+summary_list_da <- list()
+for(cat in names(category_patterns)) {
+  cpat <- category_patterns[[cat]]
+  for(tp_name in names(time_patterns)) {
+    tpat <- time_patterns[[tp_name]]
+    pat  <- paste0(tpat, ".*", cpat, ".*", qpat)
+    
+    cols <- grep(pat, qol_cols, ignore.case = TRUE, value = TRUE)
+    if (!length(cols)) next
+    
+    vals <- unlist(allIVIG[cols], use.names = FALSE) %>% as.numeric()
+    vals <- vals[!is.na(vals)]
+    
+    tab <- table(factor(vals, levels = 1:10))
+    pct <- as.numeric(tab) / sum(tab) * 100
+    mn  <- mean(vals)
+    
+    summary_list_da[[ paste(cat, tp_name) ]] <-
+      data.frame(
+        Category   = cat,
+        TimePeriod = tp_name,
+        Rating     = 1:10,
+        Percent    = pct,
+        Mean       = mn
+      )
+  }
+}
+df_da <- bind_rows(summary_list_da)
+
+plot_df_da <- df_da %>%
+  filter(!is.na(Percent) & Percent > 0) %>%
+  mutate(TimePeriod = factor(TimePeriod, levels = rev(time_lvls)))
+
+mean_df_da <- df_da %>%
+  distinct(Category, TimePeriod, Mean)
+
+ggplot(plot_df_da, aes(
+  x    = Percent,
+  y    = TimePeriod,
+  fill = factor(Rating)
+)) +
+  geom_col(position = position_stack(reverse = TRUE), width = 0.6, na.rm = TRUE) +
+  geom_text(
+    aes(label = paste0(round(Percent), "%")),
+    position = position_stack(reverse = TRUE, vjust = 0.5),
+    size     = 2.5, color = "white"
+  ) +
+  geom_text(
+    data        = mean_df_da,
+    aes(y = TimePeriod, label = sprintf("%.1f", Mean)),
+    x           = 105, hjust = 0, inherit.aes = FALSE, size = 3
+  ) +
+  geom_text(
+    data        = mean_header_df,
+    aes(x = 106, y = TimePeriod, label = label),
+    inherit.aes = FALSE, fontface = "bold", size = 3, nudge_y = 0.5
+  ) +
+  facet_wrap(~ Category, ncol = 1, labeller = as_labeller(cat_labs)) +
+  scale_x_continuous(breaks = NULL, labels = NULL, expand = c(0, 0)) +
+  coord_cartesian(xlim = c(0, 120), clip = "off") +
+  scale_fill_manual(
+    values = my_colors,
+    name   = "QoL Rating\nWhere 1 indicates 'Exceedingly Poor' and 10 indicates 'Exceedingly Good'",
+    guide  = guide_legend(title.position = "top", title.hjust = 0.5, nrow = 1)
+  ) +
+  labs(
+    title = "Daily Activities & Interests",
+    x     = NULL,
+    y     = NULL
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(hjust = 0.5, face = "bold"),
+    legend.position  = "top",
+    legend.title     = element_text(size = 8),
+    legend.text      = element_text(size = 6),
+    strip.text       = element_text(face = "bold"),
+    panel.grid       = element_blank(),
+    panel.background = element_blank(),
+    plot.margin      = margin(5.5, 40, 5.5, 5.5)
+  )
 
 ###############################################################################################
 #Verify each bar really sums to 100%
@@ -283,73 +646,3 @@ ggplot(plot_df, aes(
 #   group_by(Category, TimePeriod) %>% 
 #   summarise(sum_percent = sum(Percent), .groups="drop") %>% 
 #   print(n = Inf)
-
-
-
-
-
-
-
-
-###############################################################################################
-#previous approach
-
-# # Plot
-# ggplot(plot_df, aes(
-#   x    = TimePeriod,          # ← discrete categories on x
-#   y    = Percent,             # ← numeric on y
-#   fill = factor(Rating)       # ← color by rating
-# )) +
-#   # full-length stacked bars, reversed so 1 sits on the left
-#   geom_col(
-#     width    = 0.6,
-#     position = position_stack(reverse = TRUE),  # ← reverse here
-#     na.rm    = TRUE
-#   ) +
-#   # mean labels pinned just beyond the 100% line
-#   geom_text(
-#     data        = mean_df,
-#     aes(label = sprintf("%.1f", Mean), y = TimePeriod),
-#     x           = 100,           # fixed at 100%
-#     hjust       = -0.1,          # nudge outside
-#     inherit.aes = FALSE,
-#     size        = 3
-#   ) +
-#   
-#   # one panel for Patient on top, Caretaker below
-#   facet_wrap(~ Category, ncol = 1) +
-#   
-#   scale_y_continuous(
-#     limits = c(0, 100),
-#     expand = c(0, 0),
-#     breaks = seq(0, 100, 20),
-#     labels = function(x) paste0(x, "%")
-#   ) +
-#   
-#   # swap axes so bars run left→right
-#   coord_flip() +                #after setting the geoms
-#   
-#   scale_fill_manual(
-#     values = my_colors,
-#     name   = "QoL Rating\n(1 = Poor … 10 = Good)",
-#     guide  = guide_legend(
-#       title.position = "top",
-#       title.hjust    = 0.5,
-#       nrow           = 1
-#     )
-#   ) +
-#   
-#   labs(
-#     title = "Overall Quality of Life Ratings",
-#     x     = NULL,
-#     y     = "Percent of All Ratings"
-#   ) +
-#   
-#   theme_minimal(base_size = 14) +
-#   theme(
-#     legend.position    = "top",
-#     legend.title       = element_text(size = 8),
-#     legend.text        = element_text(size = 6),
-#     strip.text         = element_text(face = "bold"),
-#     panel.grid.major.y = element_blank()
-#   )
