@@ -1,0 +1,243 @@
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(ggrepel)  # Needed for smart label placement
+
+#Merged data processing
+# Set working directory and load merged data
+setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/IVIG/Merged")
+allIVIG <- read_excel("final_merged_data_6_19_2025_2.xlsx", sheet = 1)
+
+allIVIG <- allIVIG[-1, ]  # Remove the first row
+
+allIVIG <- allIVIG[1:(nrow(allIVIG) - 2), ]
+
+#categorize the responses based on the number of rows
+n_participants <- nrow(allIVIG)
+
+###############################################################################################
+#revising age plot just age at first IVIG since they are two different questions
+age_IVIG <- allIVIG$age_at_first_ivig
+
+# Make sure it’s numeric
+age_IVIG <- as.numeric(age_IVIG)
+
+# Total participants with a valid age
+n_participants_IVIGage <- sum(!is.na(age_IVIG))
+
+# Summary stats
+age_summary <- tibble(age = age_IVIG) %>%
+  summarise(
+    median_age = median(age, na.rm = TRUE),
+    mean_age   = mean(age,   na.rm = TRUE),
+    min_age    = min(age,    na.rm = TRUE),
+    max_age    = max(age,    na.rm = TRUE)
+  )
+
+# Build the plotting data
+age_data <- tibble(age = age_IVIG) %>%
+  filter(!is.na(age)) %>%
+  count(age) %>%
+  mutate(percentage = n / n_participants * 100)
+
+# Legend text
+legend_text <- paste0(
+  "N = ",   n_participants_IVIGage,
+  " | Median = ", age_summary$median_age,
+  " | Mean = ",   round(age_summary$mean_age, 1),
+  " | Range = ",  age_summary$min_age, "–", age_summary$max_age
+)
+
+# custom colors
+purple           <- "#4B0082"
+medpurple        <- "#8c74b8"
+mediumslateblue  <- "#7B68EE"
+
+#Plot exactly as before, replacing age_filled with age
+ggplot(age_data, aes(
+  x = percentage,
+  y = factor(age, levels = rev(sort(unique(age))))
+)) +
+  # shadow
+  geom_col(aes(x = percentage - 0.9), fill = "gray30", width = 0.6) +
+  # main bars
+  geom_col(fill = medpurple, color = "white", width = 0.6) +
+  # labels
+  geom_text(aes(label = paste0(round(percentage), "%")),
+            hjust = -0.2, size = 3.5, fontface = "bold") +
+  # title & caption
+  labs(
+    title   = "Age at First IVIG",
+    x       = NULL,
+    y       = "Age of Participants",
+    caption = legend_text
+  ) +
+  # expand x‐axis so labels fit
+  xlim(0, max(age_data$percentage) + 10) +
+  theme_minimal() +
+  theme(
+    plot.title          = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.title.position = "plot",
+    panel.grid          = element_blank(),
+    axis.text.x         = element_blank(),
+    axis.ticks.x        = element_blank(),
+    axis.ticks.y        = element_line(color = "black"),
+    axis.line.y         = element_line(color = "black"),
+    axis.text.y         = element_text(color = "black"),
+    axis.title.y        = element_text(angle = 0, vjust = 0.5, hjust = 1),
+    plot.caption        = element_text(hjust = 0, size = 9, margin = margin(t = 12))
+  )
+###############################################################################################
+#revising age plot
+#age in general at survey since they are two different questions
+age <- allIVIG$age
+
+# Make sure it’s numeric
+age <- as.numeric(age)
+
+# Total participants with a valid age
+n_participants_age <- sum(!is.na(age))
+
+# Summary stats
+age_summary <- tibble(age = age) %>%
+  summarise(
+    median_age = median(age, na.rm = TRUE),
+    mean_age   = mean(age,   na.rm = TRUE),
+    min_age    = min(age,    na.rm = TRUE),
+    max_age    = max(age,    na.rm = TRUE)
+  )
+
+# Build the plotting data
+age_data <- tibble(age = age) %>%
+  filter(!is.na(age)) %>%
+  count(age) %>%
+  mutate(percentage = n / n_participants * 100)
+
+# Legend text
+legend_text <- paste0(
+  "N = ",   n_participants_age,
+  " | Median = ", age_summary$median_age,
+  " | Mean = ",   round(age_summary$mean_age, 1),
+  " | Range = ",  age_summary$min_age, "–", age_summary$max_age
+)
+
+# custom colors
+purple           <- "#4B0082"
+medpurple        <- "#8c74b8"
+mediumslateblue  <- "#7B68EE"
+
+#Plot exactly as before, replacing age_filled with age
+ggplot(age_data, aes(
+  x = percentage,
+  y = factor(age, levels = rev(sort(unique(age))))
+)) +
+  # shadow
+  geom_col(aes(x = percentage - 0.9), fill = "gray30", width = 0.6) +
+  # main bars
+  geom_col(fill = medpurple, color = "white", width = 0.6) +
+  # labels
+  geom_text(aes(label = paste0(round(percentage), "%")),
+            hjust = -0.2, size = 3.5, fontface = "bold") +
+  # title & caption
+  labs(
+    title   = "Age at Survey (Just Qualtrics)",
+    x       = NULL,
+    y       = "Age of Participants",
+    caption = legend_text
+  ) +
+  # expand x‐axis so labels fit
+  xlim(0, max(age_data$percentage) + 10) +
+  theme_minimal() +
+  theme(
+    plot.title          = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.title.position = "plot",
+    panel.grid          = element_blank(),
+    axis.text.x         = element_blank(),
+    axis.ticks.x        = element_blank(),
+    axis.ticks.y        = element_line(color = "black"),
+    axis.line.y         = element_line(color = "black"),
+    axis.text.y         = element_text(color = "black"),
+    axis.title.y        = element_text(angle = 0, vjust = 0.5, hjust = 1),
+    plot.caption        = element_text(hjust = 0, size = 9, margin = margin(t = 12))
+  )
+
+###############################################################################################
+#previous plot the ages of merged data
+#use age for qualtrics but age at first IVIG for Trial Kit right now 
+#more specifically if the person didn't receive IVIG their age at survey was pulled
+allIVIG <- allIVIG %>%
+  mutate(age_filled = coalesce(age_at_first_ivig, age))
+
+# Clean age column in case it's still a character
+allIVIG$age_filled <- as.numeric(allIVIG$age_filled)
+
+# Compute summary stats
+age_summary <- allIVIG %>%
+  summarize(
+    median_age = median(age_filled, na.rm = TRUE),
+    mean_age = mean(age_filled, na.rm = TRUE),
+    min_age = min(age_filled, na.rm = TRUE),
+    max_age = max(age_filled, na.rm = TRUE)
+  )
+
+# Calculate the percentage for each age - but exclude the last two rows
+age_data <- allIVIG %>%
+  filter(!is.na(age_filled)) %>%
+  count(age_filled) %>%
+  mutate(percentage = n / n_participants * 100)
+
+# Build the legend string
+legend_text <- paste0(
+  "N = ", n_participants,
+  " | Median = ", age_summary$median_age,
+  " | Mean = ", round(age_summary$mean_age, 1),
+  " | Range = ", age_summary$min_age, "–", age_summary$max_age
+)
+
+# Custom colors
+purple <- '#4B0082'
+medpurple <-'#8c74b8'
+mediumslateblue <- "#7B68EE"
+
+# Now plot and sort age from youngest to oldest
+ggplot(age_data, aes(x = percentage, y = factor(age_filled, levels = rev(sort(unique(age_filled)))))) +
+  # "Shadow" layer: slightly offset gray bar underneath
+  geom_bar(aes(x = percentage - 0.9), stat = "identity", fill = "gray30", width = 0.6) +
+  
+  # Main bar layer
+  geom_bar(stat = "identity", fill = medpurple, color = "white", width = 0.6) +
+  
+  # Percentage labels
+  geom_text(aes(label = paste0(round(percentage), "%")), 
+            hjust = -0.2, size = 3.5, color = "black", fontface = "bold") +
+  
+  # Labels and title
+  labs(
+    title = "Age at First IVIG or at Survey",
+    x = NULL,
+    y = "Age of Participants",
+    caption = legend_text
+  ) +
+  xlim(0, max(age_data$percentage) + 10) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),  # Fully centered
+    plot.title.position = "plot",  # Ensure title is centered across full plot width
+    panel.grid = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_line(color = "black"),
+    axis.line.y = element_line(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.title.y = element_text(angle = 0, vjust = 0.5, hjust = 1),
+    plot.caption = element_text(hjust = 0, size = 9, margin = margin(t = 12))
+  )
+
+#age data source comparison
+# Define your two groups
+group2age <- allIVIG$age_filled[1:37]
+group1age <- allIVIG$age_filled[38:67]
+
+#to assume equal variance - students t test
+t.test(group1age, group2age, var.equal = TRUE)
