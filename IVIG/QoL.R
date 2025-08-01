@@ -7,15 +7,30 @@ library(scales)
 library(tidyverse)
 library(purrr)
 library(RColorBrewer)
+library(writexl)
 
 #Merged data processing
 #bring in the data
 # Set working directory and load merged data
 setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/IVIG/Merged")
-allIVIG <- read_excel("final_merged_data_6_19_2025_2.xlsx", sheet = 1)
+allIVIG <- read_excel("IVIGDataBook_7_31_25.xlsx", sheet = 1)
 
 #categorize the responses based on the number of rows
 n_participants <- nrow(allIVIG)
+#############################################################################################
+#adding in the none to minimal vs substantial categories to re-plot with those
+# Categorize based on output text, treating both "" and NA as "Blank"
+allIVIG$Coverage_cat_grouped <- dplyr::case_when(
+  is.na(allIVIG$Coverage_category) | trimws(allIVIG$Coverage_category) == "" ~ "Blank",
+  allIVIG$Coverage_category == "None to Minimal" ~ "None to Minimal",
+  allIVIG$Coverage_category == "Substantial" ~ "Substantial",
+  TRUE ~ "Other"  # Safety net
+)
+
+# defining these to correct N on plot, this needs to be outside the loop:
+overall_patient_cols   <- grep("patient", qol_cols, value=TRUE, ignore.case=TRUE)
+overall_caretaker_cols <- grep("family|caretaker|cohabitant", qol_cols,
+                               value=TRUE, ignore.case=TRUE)
 #############################################################################################
 # ───────────────────────────────────────
 # Define 5 questions and the regex to pick them out
@@ -640,9 +655,224 @@ ggplot(plot_df_da, aes(
     plot.margin      = margin(5.5, 40, 5.5, 5.5)
   )
 
+#############################################################################################
+#Create a named list of subsets - plots for subcategories none to minimal and substantial 
+coverage_list <- list(
+  "None to Minimal" = allIVIG %>% filter(Coverage_cat_grouped == "None to Minimal"),
+  "Substantial"     = allIVIG %>% filter(Coverage_cat_grouped == "Substantial")
+)
+
+# Pick your question key and pattern
+for (qkey in names(question_patterns)) {
+  qpat <- question_patterns[[qkey]]
+  
+  # Loop over each coverage subset for the none to minimal and the substantial
+  for (cov_name in names(coverage_list)) {
+    data_cov <- coverage_list[[cov_name]]
+    
+    # recalc Ns: removing any NAs
+    n_patient_cov   <- sum(rowSums(!is.na(data_cov[, overall_patient_cols ])) > 0)
+    n_caretaker_cov <- sum(rowSums(!is.na(data_cov[, overall_caretaker_cols])) > 0)
+    cat_labs_cov <- c(
+      Patient   = sprintf("Patient (N=%d)",   n_patient_cov),
+      Caretaker = sprintf("Caretaker (N=%d)", n_caretaker_cov)
+    )
+    
+    summary_list_cov <- list()
+    for(cat in names(category_patterns)) {
+      for(tp in names(time_patterns)) {
+        pat  <- paste0(time_patterns[[tp]], ".*",
+                       category_patterns[[cat]], ".*", qpat)
+        cols <- grep(pat, qol_cols, ignore.case=TRUE, value=TRUE)
+        if (!length(cols)) next
+        
+        vals <- unlist(data_cov[cols], use.names=FALSE) %>% as.numeric()
+        vals <- vals[!is.na(vals)]
+        tab  <- table(factor(vals, levels=1:10))
+        pct  <- as.numeric(tab)/sum(tab)*100
+        mn   <- mean(vals)
+        
+        summary_list_cov[[ paste(cat, tp) ]] <-
+          data.frame(Category=cat, TimePeriod=tp,
+                     Rating=1:10, Percent=pct, Mean=mn)
+      }
+    }
+    df_cov      <- bind_rows(summary_list_cov)
+    plot_df_cov <- df_cov %>%
+      filter(Percent>0) %>%
+      mutate(TimePeriod=factor(TimePeriod, levels=rev(names(time_patterns))))
+    mean_df_cov <- df_cov %>% distinct(Category, TimePeriod, Mean)
+    
+    # Rebuild the “Mean” header row so it appears above the bottom bar
+    mean_header_df_cov <- data.frame(
+      Category   = unique(plot_df_cov$Category),
+      TimePeriod = factor("3-Month Before IVIG",
+                          levels=levels(plot_df_cov$TimePeriod)),
+      label      = "Mean"
+    )
+    
+    # #QC verifying each bar really sums to 100 for the new none to minimal and substantial plots
+    # # 1) print a header so you know which combo you’re looking at
+    # cat("\nVerifying:", qkey, "|", cov_name, "\n")
+    # 
+    # # 2) group & sum on the exact data you’re plotting
+    # plot_df_cov %>%
+    #   # optionally tag it so the output shows Question & Coverage too
+    #   mutate(
+    #     Question = qkey,
+    #     Coverage = cov_name
+    #   ) %>%
+    #   group_by(Question, Coverage, Category, TimePeriod) %>%
+    #   summarise(
+    #     sum_percent = sum(Percent),
+    #     .groups = "drop"
+    #   ) %>%
+    #   print(n = Inf)
+    
+    # plot, but change the title line to:
+    p <- ggplot(plot_df_cov, aes(Percent, TimePeriod, fill=factor(Rating))) +
+      geom_col(position=position_stack(reverse=TRUE), width=0.6, na.rm=TRUE) +
+      geom_text(aes(label=paste0(round(Percent), "%")),
+                position=position_stack(reverse=TRUE, vjust=0.5),
+                size=2.5, color="white") +
+      geom_text(data=mean_df_cov,
+                aes(y=TimePeriod, label=sprintf("%.1f", Mean)),
+                x=105, hjust=0, inherit.aes=FALSE, size=3) +
+      geom_text(data=mean_header_df_cov,
+                aes(x=106, y=TimePeriod, label=label),
+                inherit.aes=FALSE, fontface="bold", size=3, nudge_y=0.5) +
+      facet_wrap(~ Category, ncol=1,
+                 labeller= labeller(Category = cat_labs_cov)) +
+      scale_x_continuous(breaks=NULL, labels=NULL, expand=c(0,0)) +
+      coord_cartesian(xlim=c(0,120), clip="off") +
+      scale_fill_manual(values=my_colors,
+                        name="QoL Rating\nWhere 1 indicates 'Exceedingly Poor' and 10 indicates 'Exceedingly Good'",
+                        guide=guide_legend(title.position="top", title.hjust=0.5, nrow=1)) +
+      labs(
+        title = paste0(qkey, " QoL Ratings for '", cov_name, "'"),
+        x     = NULL,
+        y     = NULL
+      ) +
+      theme_minimal(base_size=14) +
+      theme(
+        plot.title       = element_text(hjust=0.5, face="bold"),
+        legend.position  = "top",
+        legend.title     = element_text(size=8),
+        legend.text      = element_text(size=6),
+        strip.text       = element_text(face="bold"),
+        panel.grid       = element_blank(),
+        panel.background = element_blank(),
+        plot.margin      = margin(5.5,40,5.5,5.5)
+      )
+    
+    print(p)
+  }
+}
+
 ###############################################################################################
+#summany calculations for easier comparisons 
+# ── 1) Overall table summary (first 5 “total” plots) ────────────────────────────────────────────
+overall_summary_list <- list()
+
+for (qkey in names(question_patterns)) {
+  qpat <- question_patterns[[qkey]]
+  for (cat in names(category_patterns)) {
+    cpat <- category_patterns[[cat]]
+    for (tp in names(time_patterns)) {
+      tpat <- time_patterns[[tp]]
+      pat  <- paste0(tpat, ".*", cpat, ".*", qpat)
+      cols <- grep(pat, qol_cols, ignore.case = TRUE, value = TRUE)
+      if (!length(cols)) next
+      
+      vals <- unlist(allIVIG[cols], use.names = FALSE) %>% 
+        as.numeric() %>% 
+        na.omit()
+      
+      overall_summary_list[[paste(qkey, cat, tp)]] <- 
+        data.frame(
+          Question   = qkey,
+          TimePeriod = tp,
+          Category   = cat,
+          N          = length(vals),
+          Mean       = mean(vals)
+        )
+    }
+  }
+}
+
+overall_summary_df <- bind_rows(overall_summary_list)
+
+# collapse N+Mean into one column
+overall_table <- overall_summary_df %>%
+  mutate(Total = paste0(N, " (", round(Mean, 1), ")")) %>%
+  select(Question, TimePeriod, Category, Total)
+
+# view it
+print(overall_table)
+###############################################################################################
+# ── 2) Subset summaries (“None to Minimal” vs “Substantial”) ────────────────────
+
+make_sub_summary <- function(group_name) {
+  df_list <- list()
+  dat <- allIVIG %>% filter(Coverage_cat_grouped == group_name)
+  
+  for (qkey in names(question_patterns)) {
+    qpat <- question_patterns[[qkey]]
+    for (cat in names(category_patterns)) {
+      cpat <- category_patterns[[cat]]
+      for (tp in names(time_patterns)) {
+        tpat <- time_patterns[[tp]]
+        pat  <- paste0(tpat, ".*", cpat, ".*", qpat)
+        cols <- grep(pat, qol_cols, ignore.case = TRUE, value = TRUE)
+        if (!length(cols)) next
+        
+        vals <- unlist(dat[cols], use.names = FALSE) %>% 
+          as.numeric() %>% 
+          na.omit()
+        
+        df_list[[paste(qkey, cat, tp)]] <-
+          data.frame(
+            Question   = qkey,
+            TimePeriod = tp,
+            Category   = cat,
+            N          = length(vals),
+            Mean       = mean(vals)
+          )
+      }
+    }
+  }
+  
+  bind_rows(df_list)
+}
+
+none_df <- make_sub_summary("None to Minimal") %>%
+  mutate(None_to_Minimal = paste0(N, " (", round(Mean, 1), ")")) %>%
+  select(Question, TimePeriod, Category, None_to_Minimal)
+
+sub_df  <- make_sub_summary("Substantial") %>%
+  mutate(Substantial = paste0(N, " (", round(Mean, 1), ")")) %>%
+  select(Question, TimePeriod, Category, Substantial)
+
+subset_table <- left_join(none_df, sub_df,
+                          by = c("Question", "TimePeriod", "Category"))
+
+# view it
+print(subset_table)
+
+###############################################################################################
+# save tabular data in an xlsx
+sheets <- list(
+  "Overall Summary"   = overall_table,
+  "Coverage Subsets"  = subset_table
+)
+
+# write out an .xlsx with two tabs
+write_xlsx(sheets, path = "QoL_summary_tables.xlsx")
+###############################################################################################
+#QC
 #Verify each bar really sums to 100%
 # plot_df %>% 
 #   group_by(Category, TimePeriod) %>% 
 #   summarise(sum_percent = sum(Percent), .groups="drop") %>% 
 #   print(n = Inf)
+###############################################################################################
