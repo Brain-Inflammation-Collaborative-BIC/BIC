@@ -1,0 +1,112 @@
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(writexl)
+library(stringr)
+library(colorspace)
+library(tidyverse)
+library(tidytext)
+library(wordcloud)
+
+# Set working directory and load merged data
+setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/Unhide/Data")
+conditions <- read_excel("10_03_25_ME_LC_HC_Conditioncounts_1.xlsx")
+
+#############################################################################
+
+# keep only numeric columns but drop those ending in "other"
+#because I brought in the free response others
+# ---- settings ----
+subgroup_cols <- c("casecontrol_me_cfs", "casecontrol_long_covid", "casecontrol_none")
+
+# Optional: name the ID column(s) if present and numeric so we can exclude them from sums
+id_cols <- intersect(c("participantidentifier","ID","id"), names(conditions))
+
+# # ---- ensure subgroup columns are numeric 0/1 (in case they're "Yes"/"No") ----
+# for (sg in subgroup_cols) {
+#   if (!is.numeric(conditions[[sg]])) {
+#     conditions[[sg]] <- ifelse(tolower(conditions[[sg]]) %in% c("1","yes","true","y"), 1L, 0L)
+#   }
+# }
+
+# ---- report subgroup Ns ----
+subgroup_sizes <- sapply(subgroup_cols, function(col) sum(conditions[[col]], na.rm = TRUE))
+subgroup_sizes_df <- data.frame(
+  subgroup = subgroup_cols,
+  N = as.integer(subgroup_sizes)
+)
+print(subgroup_sizes_df)
+
+# --- build_counts_df with 1% cutoff for a given subgroup filter ----
+build_counts_df <- function(df, subgroup_col) {
+  
+  # filter to this subgroup's rows
+  df_sub <- df[df[[subgroup_col]] == 1, , drop = FALSE]
+  
+  # columns to count: numeric, NOT ending in "other", NOT the casecontrol columns, NOT ID columns
+  is_num <- sapply(df_sub, is.numeric)
+  keep_names <- names(df_sub)[is_num]
+  
+  keep_names <- keep_names[!grepl("other$", keep_names, ignore.case = TRUE)]
+  keep_names <- setdiff(keep_names, subgroup_cols)
+  keep_names <- setdiff(keep_names, id_cols)
+  
+  # safety: if nothing left, stop with a clear message
+  if (length(keep_names) == 0) stop("No numeric condition columns found after exclusions.")
+  
+  # sum counts by column
+  condition_counts <- colSums(df_sub[ , keep_names, drop = FALSE], na.rm = TRUE)
+  total <- sum(condition_counts)
+  
+  df_counts <- data.frame(
+    condition = names(condition_counts),
+    count = as.numeric(condition_counts),
+    stringsAsFactors = FALSE
+  )
+  
+  # clean labels + percentages
+  df_counts$condition_clean <- tools::toTitleCase(gsub("_", " ", df_counts$condition))
+  df_counts$percent <- if (total > 0) 100 * df_counts$count / total else 0
+  
+  # drop conditions < 1%
+  df_counts <- df_counts %>% filter(percent >= 1)
+  
+  list(df_counts = df_counts, total = total, n_rows = nrow(df_sub))
+}
+
+# ---- helper: plot with your previous styling ----
+plot_counts <- function(df_counts, plot_title, n_responses, total_selections) {
+  ggplot(df_counts, aes(x = reorder(condition_clean, count), y = count, fill = count)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    geom_text(aes(label = paste0(round(percent, 1), "%")),
+              hjust = -0.1, size = 4) +
+    scale_fill_gradientn(colours = c("yellow", "forestgreen", "navy")) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    theme_minimal() +
+    theme(
+      legend.position = "right",   # show gradient legend
+      panel.grid = element_blank()
+    ) +
+    labs(
+      title = paste0(plot_title, " (N = ", n_responses, ")"),
+      subtitle = paste0("Total condition selections = ", total_selections),
+      x = NULL,
+      y = "Number of Individuals"
+    )
+}
+
+
+# --- now build + plot for each subgroup ----
+res_me   <- build_counts_df(conditions, "casecontrol_me_cfs")
+res_lc   <- build_counts_df(conditions, "casecontrol_long_covid")
+res_none <- build_counts_df(conditions, "casecontrol_none")
+
+plot_counts(res_me$df_counts,   "Counts for Each Condition - ME/CFS",    res_me$n_rows,   res_me$total)
+plot_counts(res_lc$df_counts,   "Counts for Each Condition - Long COVID", res_lc$n_rows,  res_lc$total)
+plot_counts(res_none$df_counts, "Counts for Each Condition - None",       res_none$n_rows, res_none$total)
+
+#############################################################################
+
+# write out an .xlsx with two tabs
+write_xlsx(df_counts, path = "ConditionsList_ME_LC_HC.xlsx")
