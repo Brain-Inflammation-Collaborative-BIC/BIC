@@ -1,0 +1,119 @@
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(colorspace)
+library(tidyverse)
+library(tidytext)
+library(wordcloud)
+
+# Set working directory and load merged data
+setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/Unhide/Data")
+conditions <- read_excel("9_29_25_Conditioncounts_3.xlsx")
+
+#############################################################################
+
+# keep only numeric columns but drop those ending in "other"
+#because I brought in the free response others
+num_cols <- sapply(conditions, is.numeric)
+num_names <- names(conditions)[num_cols]
+
+# drop free-text "other" indicators, casecontrol flags, and likely ID columns
+drop_cols <- c(
+  grep("other$", num_names, ignore.case = TRUE, value = TRUE),
+  c("casecontrol_me_cfs","casecontrol_long_covid","casecontrol_none"),
+  intersect(c("participantidentifier","ID","id"), num_names)
+)
+keep_names <- setdiff(num_names, drop_cols)
+
+# subset to only the numeric condition columns we want
+conditions_num <- conditions[, keep_names, drop = FALSE]
+
+# --- totals ---
+condition_counts  <- colSums(conditions_num, na.rm = TRUE)
+total_selections  <- sum(condition_counts)
+n_responses       <- sum(rowSums(conditions_num, na.rm = TRUE) > 0)  # participants with ≥1 selection
+
+# Make df with percentages
+df_counts <- data.frame(
+  condition = names(condition_counts),
+  count = as.numeric(condition_counts),
+  stringsAsFactors = FALSE
+)
+
+# clean labels + percentages
+df_counts$condition_clean <- tools::toTitleCase(gsub("_", " ", df_counts$condition))
+df_counts$percent <- if (total > 0) 100 * df_counts$count / total else 0
+
+# Add percentages
+df_counts$percent <- 100 * df_counts$count / total
+
+# drop conditions < 1%
+df_counts <- df_counts %>% filter(percent >= 1)
+
+# Horizontal bar plot with % labels
+  ggplot(df_counts, aes(x = reorder(condition_clean, count), y = count, fill = count)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    geom_text(aes(label = paste0(round(percent, 1), "%")), hjust = -0.1, size = 4) +
+    scale_fill_gradientn(colours = c("yellow", "forestgreen", "navy")) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    theme_minimal() +
+    theme(
+      legend.position = "right",   # show gradient legend
+      panel.grid = element_blank()
+    ) +
+    labs(
+      title = paste0("Counts for Each Condition", " (N = ", n_responses, ")"),
+      subtitle = paste0("Total condition selections = ", total_selections),
+      x = NULL,
+      y = "Number of Individuals"
+    )
+
+#############################################################################
+# write out an .xlsx with two tabs
+write_xlsx(sheets, path = "ConditionsList.xlsx")
+
+#############################################################################
+
+#############################################################################
+
+#word cloud
+# 1) Grab only text columns (character or factor)
+text_cols <- names(conditions)[sapply(conditions, function(x) is.character(x) || is.factor(x))]
+
+# If no text columns, stop gracefully
+if (length(text_cols) == 0) stop("No character/factor columns found for word cloud.")
+
+# 2) Stack all “other” text into a single column
+other_text <- conditions %>%
+  select(all_of(text_cols)) %>%
+  mutate(across(everything(), as.character)) %>%
+  pivot_longer(everything(), names_to = "field", values_to = "text") %>%
+  filter(!is.na(text), trimws(text) != "")
+
+# 3) Tokenize + clean
+# Add junk words to remove
+custom_stopwords <- c(
+  "st", "uh", "na", "n/a", "none", "nothing",
+  "etc", "other", "also"   # add any survey filler words
+)
+
+tokens <- other_text %>%
+  unnest_tokens(word, text) %>%
+  filter(!str_detect(word, "^[0-9]+$")) %>%  # drop pure numbers
+  anti_join(stop_words, by = "word") %>%     # remove standard English stopwords
+  filter(!word %in% custom_stopwords)        # remove survey-specific junk
+
+# 4) Word frequencies
+freq <- tokens %>%
+  count(word, sort = TRUE)
+
+# 5) Plot word cloud
+set.seed(123)
+wordcloud(
+  words      = freq$word,
+  freq       = freq$n,
+  max.words  = 100,
+  random.order = FALSE,
+  scale      = c(4, 0.8)
+)
