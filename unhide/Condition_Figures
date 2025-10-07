@@ -8,7 +8,7 @@ library(wordcloud)
 
 # Set working directory and load merged data
 setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/Unhide/Data")
-conditions <- read_excel("9_29_25_Conditioncounts_3.xlsx")
+conditions <- read_excel("10_07_25_BaselineIllness_Conditions.xlsx")
 
 #############################################################################
 
@@ -32,6 +32,7 @@ conditions_num <- conditions[, keep_names, drop = FALSE]
 condition_counts  <- colSums(conditions_num, na.rm = TRUE)
 total_selections  <- sum(condition_counts)
 n_responses       <- sum(rowSums(conditions_num, na.rm = TRUE) > 0)  # participants with ≥1 selection
+total <- sum(condition_counts)
 
 # Make df with percentages
 df_counts <- data.frame(
@@ -50,6 +51,17 @@ df_counts$percent <- 100 * df_counts$count / total
 # drop conditions < 1%
 df_counts <- df_counts %>% filter(percent >= 1)
 
+# --- fix specific labels ---
+replacements <- c(
+  "Hiv Aids"  = "HIV/AIDS",
+  "Pots"      = "POTS",
+  "Ptsd"      = "PTSD",
+  "Add Adhd"  = "ADD/ADHD",
+  "Irritable Bowel Syndrome" = "IBS"
+)
+
+df_counts$condition_clean <- dplyr::recode(df_counts$condition_clean, !!!replacements)
+
 # Horizontal bar plot with % labels
   ggplot(df_counts, aes(x = reorder(condition_clean, count), y = count, fill = count)) +
     geom_bar(stat = "identity") +
@@ -59,11 +71,15 @@ df_counts <- df_counts %>% filter(percent >= 1)
     scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
     theme_minimal() +
     theme(
-      legend.position = "right",   # show gradient legend
-      panel.grid = element_blank()
+      legend.position = "right",
+      panel.grid = element_blank(),
+      axis.text.y = element_text(size = 13, face = "bold"),  # y-axis category labels
+      axis.text.x = element_text(size = 12),                 # optional: tick labels
+      plot.title = element_text(size = 18, face = "bold"),   # title font
+      plot.subtitle = element_text(size = 14)                # subtitle font
     ) +
     labs(
-      title = paste0("Counts for Each Condition", " (N = ", n_responses, ")"),
+      title = paste0("Counts for all Conditions", " (N = ", n_responses, ")"),
       subtitle = paste0("Total condition selections = ", total_selections),
       x = NULL,
       y = "Number of Individuals"
