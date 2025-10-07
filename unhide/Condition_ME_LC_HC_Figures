@@ -10,7 +10,7 @@ library(wordcloud)
 
 # Set working directory and load merged data
 setwd("/Users/kelseyaguirre/Library/Mobile Documents/com~apple~CloudDocs/Documents/BrainInflammationCollaborative/Unhide/Data")
-conditions <- read_excel("10_03_25_ME_LC_HC_Conditioncounts_1.xlsx")
+conditions <- read_excel("10_07_25_BaselineIllness_Conditions.xlsx")
 
 #############################################################################
 
@@ -71,8 +71,20 @@ build_counts_df <- function(df, subgroup_col) {
   # drop conditions < 1%
   df_counts <- df_counts %>% filter(percent >= 1)
   
+  #new
+  # --- fix specific labels ---
+  replacements <- c(
+    "Hiv Aids"  = "HIV/AIDS",
+    "Pots"      = "POTS",
+    "Ptsd"      = "PTSD",
+    "Add Adhd"  = "ADD/ADHD",
+    "Irritable Bowel Syndrome" = "IBS"
+  )
+  df_counts$condition_clean <- dplyr::recode(df_counts$condition_clean, !!!replacements)
+  
   list(df_counts = df_counts, total = total, n_rows = nrow(df_sub))
 }
+
 
 # ---- helper: plot with your previous styling ----
 plot_counts <- function(df_counts, plot_title, n_responses, total_selections) {
@@ -85,8 +97,12 @@ plot_counts <- function(df_counts, plot_title, n_responses, total_selections) {
     scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
     theme_minimal() +
     theme(
-      legend.position = "right",   # show gradient legend
-      panel.grid = element_blank()
+      legend.position = "right",
+      panel.grid = element_blank(),
+      axis.text.y = element_text(size = 13, face = "bold"),  # y-axis category labels
+      axis.text.x = element_text(size = 12),                 # optional: tick labels
+      plot.title = element_text(size = 18, face = "bold"),   # title font
+      plot.subtitle = element_text(size = 14)                # subtitle font
     ) +
     labs(
       title = paste0(plot_title, " (N = ", n_responses, ")"),
