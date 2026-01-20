@@ -1,0 +1,93 @@
+from pathlib import Path
+import pandas as pd
+from datetime import datetime
+
+#kelsey's path - define yours to use
+DATA_DIR = Path(
+    "/Users/kelseyaguirre/Library/Mobile Documents/"
+    "com~apple~CloudDocs/Documents/"
+    "BrainInflammationCollaborative/YouplusME/Cleaned"
+)
+
+USER_ID = "[enter ID you would like to pull here]" 
+
+def normalize_userid(s: pd.Series) -> pd.Series:
+        # Only touch userid
+    return s.astype(str).str.strip()
+
+def load_csv(path: Path) -> pd.DataFrame:
+        # Keeps numeric columns numeric; avoids chunk-type warnings
+    return pd.read_csv(path, low_memory=False)
+
+def load_excel_all_sheets(path: Path) -> dict[str, pd.DataFrame]:
+    xls = pd.ExcelFile(path)
+    return {sheet: pd.read_excel(path, sheet_name=sheet) for sheet in xls.sheet_names}
+
+def filter_by_userid(df: pd.DataFrame, userid: str, userid_col: str = "userid") -> pd.DataFrame:
+    if userid_col not in df.columns:
+        raise KeyError(f"Expected column '{userid_col}' not found. Columns: {list(df.columns)[:20]} ...")
+
+    df = df.copy()
+    df[userid_col] = normalize_userid(df[userid_col])
+    return df[df[userid_col] == str(userid).strip()]
+
+from datetime import datetime
+
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+# 1) Find CSV files (CSV only, no XLSX)
+csv_paths = sorted(DATA_DIR.glob("*.csv"))
+
+results: dict[str, pd.DataFrame] = {}
+
+print(f"Filtering for USER_ID = {repr(USER_ID)}")
+
+# 2) Process CSVs
+for p in csv_paths:
+    df = load_csv(p)
+    filtered = filter_by_userid(df, USER_ID, userid_col="userid")
+
+    print(f"CSV {p.name}: {len(filtered)} rows for this user")
+
+    if not filtered.empty:
+        results[p.stem] = filtered
+
+# 3) Build combined ALL_DATA once (if there is any data)
+combined = None
+if results:
+    combined = pd.concat(
+        [df.assign(source=name) for name, df in results.items()],
+        ignore_index=True,
+    )
+
+# 4) Write Excel workbook (per-sheet + ALL_DATA + Summary)
+out_xlsx = DATA_DIR / f"userid_{USER_ID}_compiled_{timestamp}.xlsx"
+
+summary_rows = []
+with pd.ExcelWriter(out_xlsx, engine="openpyxl") as writer:
+    # Per-CSV sheets
+    for name, df in results.items():
+        sheet_name = name[:31]
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+        summary_rows.append(
+            {"sheet": sheet_name, "rows": len(df), "cols": len(df.columns)}
+        )
+
+    # ALL_DATA sheet
+    if combined is not None:
+        combined.to_excel(writer, sheet_name="ALL_DATA", index=False)
+
+    # Summary
+    pd.DataFrame(summary_rows).to_excel(
+        writer, sheet_name="Summary", index=False
+    )
+
+print(f"Wrote Excel to: {out_xlsx}")
+
+# 5) Also write ALL_DATA as CSV (simple, for sharing with those who don't have office)
+if combined is not None:
+    out_csv = DATA_DIR / f"userid_{USER_ID}_ALL_DATA_{timestamp}.csv"
+    combined.to_csv(out_csv, index=False)
+    print(f"Wrote ALL_DATA CSV to: {out_csv}")
+else:
+    print("No rows found for this USER_ID; no CSV written.")
