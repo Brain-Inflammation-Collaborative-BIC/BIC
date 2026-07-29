@@ -3,6 +3,14 @@ import re
 import sys
 import os
 
+# Matching notes:
+# - Longer, more specific phrases take priority over broader overlapping terms.
+# - Keywords use whole-word/whole-phrase matching by default.
+# - Add an optional MatchType column to the Mapping sheet and use "partial"
+#   only for intentional stems such as "gabap" -> "gabapentin".
+# - Common misspellings should be added as separate keyword rows mapped to the
+#   same StandardTreatment. This is safer than automatically fuzzy-mapping text.
+
 QUESTION_MAP = {
     "### Which treatments have **helped somewhat** with your symptoms, daily life, and overall health?": "MildlyEffectiveTreatments",
     "### Are there any treatments that **worked when you started** taking them but then **stopped working**?": "Worked then didn't",
@@ -75,8 +83,26 @@ def prepare_mapping(mapping):
     m = mapping.copy()
     m["keyword"] = m["keyword"].astype(str).map(clean_keyword)
     m = m[m["keyword"].ne("")].copy()
+
+    # Optional column. Default behavior is safe whole-word/whole-phrase matching.
+    # Use MatchType = partial only for intentional stems, such as:
+    # gabap -> gabapentin
+    if "MatchType" not in m.columns:
+        m["MatchType"] = "whole"
+    else:
+        m["MatchType"] = (
+            m["MatchType"]
+            .fillna("whole")
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+
     m["keyword_length"] = m["keyword"].str.len()
-    m = m.sort_values(["keyword_length", "keyword"], ascending=[False, True]).reset_index(drop=True)
+    m = m.sort_values(
+        ["keyword_length", "keyword"],
+        ascending=[False, True]
+    ).reset_index(drop=True)
     return m
 
 def build_long_data(data):
@@ -108,26 +134,86 @@ def build_long_data(data):
     return pd.DataFrame(rows)
 
 def find_matches(text, mapping):
-    matches = []
+    """
+    Match treatments while preventing broad keywords from overriding specific ones.
+
+    Examples:
+      - "ot" matches standalone "OT", but not "protein" or "botox".
+      - "physical therapy" wins over the broader overlapping keyword "therapy".
+      - Non-overlapping treatments in the same response can still both be mapped.
+
+    Poor spelling/grammar:
+      - Text normalization handles capitalization, spacing, punctuation, and common
+        encoding problems.
+      - Add known misspellings as Mapping-sheet keyword rows (for example,
+        "therepy" and "therpay") mapped to the intended StandardTreatment.
+      - Use optional MatchType = "partial" only for intentional word stems.
+    """
+    candidates = []
+
     for _, row in mapping.iterrows():
         kw = row["keyword"]
-        if kw and kw in text:
-            matches.append({
+        if not kw:
+            continue
+
+        match_type = str(row.get("MatchType", "whole")).strip().lower()
+
+        if match_type in {"partial", "contains", "substring"}:
+            pattern = re.escape(kw)
+        else:
+            # Whole word/phrase boundaries. This prevents "ot" matching "protein".
+            pattern = r"(?<!\w)" + re.escape(kw) + r"(?!\w)"
+
+        for hit in re.finditer(pattern, text, flags=re.IGNORECASE):
+            candidates.append({
+                "start": hit.start(),
+                "end": hit.end(),
+                "length": hit.end() - hit.start(),
                 "matched_keyword": kw,
                 "StandardTreatment": row["StandardTreatment"],
                 "Category": row["Category"],
                 "SubCategory": row["SubCategory"],
             })
 
-    seen = set()
-    deduped = []
-    for m in matches:
-        key = (m["matched_keyword"], m["StandardTreatment"], m["Category"], m["SubCategory"])
-        if key not in seen:
-            seen.add(key)
-            deduped.append(m)
+    # Longest phrases first, then earliest position.
+    candidates.sort(key=lambda x: (-x["length"], x["start"], x["matched_keyword"]))
 
-    return deduped
+    selected = []
+    occupied_spans = []
+    selected_treatments = set()
+
+    for candidate in candidates:
+        treatment_key = (
+            candidate["StandardTreatment"],
+            candidate["Category"],
+            candidate["SubCategory"],
+        )
+
+        # Keep only the most specific keyword for the same standardized treatment.
+        if treatment_key in selected_treatments:
+            continue
+
+        overlaps = any(
+            candidate["start"] < existing_end
+            and candidate["end"] > existing_start
+            for existing_start, existing_end in occupied_spans
+        )
+
+        # A longer phrase already claimed this part of the response.
+        # Example: keep "physical therapy" and suppress overlapping "therapy".
+        if overlaps:
+            continue
+
+        selected.append({
+            "matched_keyword": candidate["matched_keyword"],
+            "StandardTreatment": candidate["StandardTreatment"],
+            "Category": candidate["Category"],
+            "SubCategory": candidate["SubCategory"],
+        })
+        occupied_spans.append((candidate["start"], candidate["end"]))
+        selected_treatments.add(treatment_key)
+
+    return selected
 
 def code_treatments(long_df, mapping):
     coded_rows = []
@@ -301,18 +387,13 @@ def write_output(output_path, long_df, coded_df, unmatched_df):
         writer.sheets[OUTPUT_SHEETS["unmatched"]].hide()
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 treatment_mapper_full_python.py <input_excel_file> [output_excel_file]")
-        sys.exit(1)
 
-    input_path = sys.argv[1]
+    input_path = "/Users/jameshunt/Desktop/BIC Data/Treatment Effectivness/July15thWHWD.xlsx"
+    output_path = "/Users/jameshunt/Desktop/BIC Data/Treatment Effectivness/July15thWHWD_python_output.xlsx"
+
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"File not found: {input_path}")
-
-    if len(sys.argv) >= 3:
-        output_path = sys.argv[2]
-    else:
-        output_path = input_path.replace(".xlsx", "_python_output.xlsx")
+    
 
     data, mapping = load_raw_and_mapping(input_path)
     mapping = prepare_mapping(mapping)
